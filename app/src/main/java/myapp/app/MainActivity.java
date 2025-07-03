@@ -19,19 +19,20 @@ import android.widget.TextView;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 
+
 public class MainActivity extends Activity {
-  private TextView statusText;
-  private Button recordButton;
-  private Button playButton;
-  private AudioRecord recorder;
-  private AudioTrack player;
-  private boolean isRecording = false;
-  private boolean isPlaying = false;
-  private int sampleRate = 16000;
-  private byte[] recordedData = new byte[sampleRate * 2 * 60 * 15]; // 15 minutes
-  private int recordedBytes = 0;
-  private int playbackPosition = 0;
-  private Handler handler = new Handler();
+  private TextView    statusText  ;
+  private Button      recordButton;
+  private Button      playButton  ;
+  private AudioRecord recorder    ;
+  private AudioTrack  player      ;
+  private boolean     isRecording      = false;
+  private boolean     isPlaying        = false;
+  private int         sampleRate       = 16000;
+  private byte[]      recordedData     = new byte[sampleRate * 2 * 60 * 15]; // 15 minutes
+  private int         recordedBytes    = 0;
+  private int         playbackPosition = 0;
+  private Handler     handler          = new Handler();
 
   private static final int PERMISSION_REQUEST_CODE = 200;
 
@@ -44,20 +45,20 @@ public class MainActivity extends Activity {
 
     recordButton = new Button(this);
     recordButton.setText("Start Recording");
-    layout.addView(recordButton);
+    layout      .addView(recordButton);
 
     playButton = new Button(this);
     playButton.setText("Read Text");
-    layout.addView(playButton);
+    layout    .addView(playButton);
 
     Button toTextButton = new Button(this);
     toTextButton.setText("To Text");
-    layout.addView(toTextButton);
+    layout      .addView(toTextButton);
 
     statusText = new TextView(this);
     ScrollView scrollView = new ScrollView(this);
     scrollView.addView(statusText);
-    layout.addView(scrollView);
+    layout    .addView(scrollView);
 
     setContentView(layout);
 
@@ -90,9 +91,7 @@ public class MainActivity extends Activity {
 
   private void startRecording() {
     try {
-      recorder = new AudioRecord(MediaRecorder.AudioSource.MIC, sampleRate,
-        AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT,
-        AudioRecord.getMinBufferSize(sampleRate, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT));
+      recorder = new AudioRecord(MediaRecorder.AudioSource.MIC, sampleRate, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT, AudioRecord.getMinBufferSize(sampleRate, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT));
       recorder.startRecording();
       isRecording = true;
       recordButton.setText("Stop Recording");
@@ -102,6 +101,12 @@ public class MainActivity extends Activity {
         while (isRecording && offset < recordedData.length) {
           int read = recorder.read(recordedData, offset, recordedData.length - offset);
           if (read > 0) offset += read;
+          runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+              showStatus("Recording...");
+            }
+          });
         }
         recordedBytes = offset;
         runOnUiThread(() -> {
@@ -109,16 +114,6 @@ public class MainActivity extends Activity {
           recordButton.setText("Start Recording");
         });
       }).start();
-
-      handler.postDelayed(new Runnable() {
-        @Override
-        public void run() {
-          if (isRecording) {
-            showStatus("Recording...");
-            handler.postDelayed(this, 1000);
-          }
-        }
-      }, 1000);
 
     } catch (Exception e) {
       showStatus("Error: " + e.getMessage());
@@ -193,5 +188,6 @@ public class MainActivity extends Activity {
     String status = String.format("Bytes: %d\nDuration: %.2f sec\nPlayback Pos: %d\n%s",
       recordedBytes, seconds, playbackPosition, extra);
     runOnUiThread(() -> statusText.setText(status));
+    runOnUiThread(() -> statusText.invalidate());
   }
 }
