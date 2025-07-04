@@ -10,7 +10,6 @@ import android.media.MediaRecorder;
 import android.media.AudioManager;
 import android.os.Build;
 import android.os.Bundle;
-import android.os.Handler;
 import android.view.View;
 import android.widget.Button;
 import android.widget.LinearLayout;
@@ -19,20 +18,21 @@ import android.widget.TextView;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 
-
 public class MainActivity extends Activity {
   private TextView    statusText  ;
   private Button      recordButton;
   private Button      playButton  ;
   private AudioRecord recorder    ;
   private AudioTrack  player      ;
-  private boolean     isRecording      = false;
-  private boolean     isPlaying        = false;
-  private int         sampleRate       = 16000;
-  private byte[]      recordedData     = new byte[sampleRate * 2 * 60 * 15]; // 15 minutes
-  private int         recordedBytes    = 0;
-  private int         playbackPosition = 0;
-  private Handler     handler          = new Handler();
+  private boolean      isRecording = false;
+  private boolean      isPlaying   = false;
+  private int          sampleRate  = 16000;
+  private final byte[] recordedData     = new byte[sampleRate * 2 * 60 * 15];
+  private int 	       recordedBytes    = 0;
+  private int 	       playbackPosition = 0;
+  private final Object lock = new Object();
+  private Thread  uiUpdateThread;
+  private boolean uiUpdateRunning = true;
 
   private static final int PERMISSION_REQUEST_CODE = 200;
 
@@ -45,28 +45,28 @@ public class MainActivity extends Activity {
 
     recordButton = new Button(this);
     recordButton.setText("Start Recording");
-    layout      .addView(recordButton);
+    layout.addView(recordButton);
 
     playButton = new Button(this);
     playButton.setText("Read Text");
-    layout    .addView(playButton);
+    layout.addView(playButton);
 
     Button toTextButton = new Button(this);
     toTextButton.setText("To Text");
-    layout      .addView(toTextButton);
+    layout.addView(toTextButton);
 
     statusText = new TextView(this);
     ScrollView scrollView = new ScrollView(this);
     scrollView.addView(statusText);
-    layout    .addView(scrollView);
+    layout.addView(scrollView);
 
     setContentView(layout);
 
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
       if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO)
-        != PackageManager.PERMISSION_GRANTED) {
+          != PackageManager.PERMISSION_GRANTED) {
         ActivityCompat.requestPermissions(this,
-          new String[]{Manifest.permission.RECORD_AUDIO}, PERMISSION_REQUEST_CODE);
+            new String[]{Manifest.permission.RECORD_AUDIO}, PERMISSION_REQUEST_CODE);
       }
     }
 
@@ -87,6 +87,33 @@ public class MainActivity extends Activity {
     });
 
     toTextButton.setOnClickListener(v -> resetBuffer());
+
+    startUIUpdateThread();
+  }
+
+  private void startUIUpdateThread() {
+    uiUpdateThread = new Thread(() -> {
+      try {
+        while (uiUpdateRunning) {
+          Thread.sleep(50);
+          runOnUiThread(this::updateStatus);
+        }
+      } catch (InterruptedException ignored) {}
+    });
+    uiUpdateThread.start();
+  }
+
+  private void updateStatus() {
+    int bytes;
+    int pos;
+    synchronized (lock) {
+      bytes = recordedBytes   ;
+      pos   = playbackPosition;
+    }
+    float seconds = (float) bytes / (sampleRate * 2);
+    String status = String.format("Bytes: %d\nDuration: %.2f sec\nPlayback Pos: %d", bytes, seconds, pos);
+    statusText.setText(status);
+    statusText.invalidate();
   }
 
   private void startRecording() {
@@ -97,26 +124,21 @@ public class MainActivity extends Activity {
       recordButton.setText("Stop Recording");
 
       new Thread(() -> {
-        int offset = recordedBytes;
+	int offset = 0;
+        int chunkSize = 8192;
         while (isRecording && offset < recordedData.length) {
-          int read = recorder.read(recordedData, offset, recordedData.length - offset);
-          if (read > 0) offset += read;
-          runOnUiThread(new Runnable() {
-            @Override
-            public void run() {
-              showStatus("Recording...");
+          int read = recorder.read(recordedData, offset, Math.min(chunkSize, recordedData.length - offset));
+          if (read > 0) {
+            offset += read;
+            synchronized (lock) {
+              recordedBytes = offset;
             }
-          });
+          }
         }
-        recordedBytes = offset;
-        runOnUiThread(() -> {
-          showStatus("Recording stopped.");
-          recordButton.setText("Start Recording");
-        });
+        runOnUiThread(() -> recordButton.setText("Start Recording"));
       }).start();
-
     } catch (Exception e) {
-      showStatus("Error: " + e.getMessage());
+      updateStatus();
     }
   }
 
@@ -124,42 +146,51 @@ public class MainActivity extends Activity {
     try {
       isRecording = false;
       if (recorder != null) {
-        recorder.stop();
+        recorder.stop   ();
         recorder.release();
         recorder = null;
       }
     } catch (Exception e) {
-      showStatus("Error: " + e.getMessage());
+      updateStatus();
     }
   }
 
   private void startPlayback() {
     try {
-      if (playbackPosition >= recordedBytes) playbackPosition = 0;
-
-      int bufferSize = AudioTrack.getMinBufferSize(sampleRate, AudioFormat.CHANNEL_OUT_MONO,
-        AudioFormat.ENCODING_PCM_16BIT);
-
+      synchronized (lock) {
+        if (playbackPosition >= recordedBytes) playbackPosition = 0;
+      }
+      int bufferSize = AudioTrack.getMinBufferSize(sampleRate,
+          AudioFormat.CHANNEL_OUT_MONO, AudioFormat.ENCODING_PCM_16BIT);
       player = new AudioTrack(AudioManager.STREAM_MUSIC, sampleRate,
-        AudioFormat.CHANNEL_OUT_MONO, AudioFormat.ENCODING_PCM_16BIT,
-        bufferSize, AudioTrack.MODE_STREAM);
-
+          AudioFormat.CHANNEL_OUT_MONO, AudioFormat.ENCODING_PCM_16BIT,
+          bufferSize, AudioTrack.MODE_STREAM);
       player.play();
       isPlaying = true;
       playButton.setText("Stop Playback");
 
       new Thread(() -> {
         int chunkSize = 1024;
-        while (isPlaying && playbackPosition < recordedBytes) {
-          int toWrite = Math.min(chunkSize, recordedBytes - playbackPosition);
-          player.write(recordedData, playbackPosition, toWrite);
-          playbackPosition += toWrite;
+        int localPosition;
+        synchronized (lock) {
+          localPosition = playbackPosition;
         }
-        runOnUiThread(() -> stopPlayback());
+        while (isPlaying) {
+          int toWrite;
+          synchronized (lock) {
+            toWrite = Math.min(chunkSize, recordedBytes - localPosition);
+          }
+          if (toWrite <= 0) break;
+          player.write(recordedData, localPosition, toWrite);
+          localPosition += toWrite;
+          synchronized (lock) {
+            playbackPosition = localPosition;
+          }
+        }
+        runOnUiThread(this::stopPlayback);
       }).start();
-
     } catch (Exception e) {
-      showStatus("Error: " + e.getMessage());
+      updateStatus();
     }
   }
 
@@ -173,21 +204,15 @@ public class MainActivity extends Activity {
       }
       playButton.setText("Read Text");
     } catch (Exception e) {
-      showStatus("Error: " + e.getMessage());
+      updateStatus();
     }
   }
 
   private void resetBuffer() {
-    recordedBytes = 0;
-    playbackPosition = 0;
-    showStatus("Buffer reset.");
-  }
-
-  private void showStatus(String extra) {
-    float seconds = (float) recordedBytes / (sampleRate * 2);
-    String status = String.format("Bytes: %d\nDuration: %.2f sec\nPlayback Pos: %d\n%s",
-      recordedBytes, seconds, playbackPosition, extra);
-    runOnUiThread(() -> statusText.setText(status));
-    runOnUiThread(() -> statusText.invalidate());
+    synchronized (lock) {
+      recordedBytes    = 0;
+      playbackPosition = 0;
+    }
+    updateStatus();
   }
 }
