@@ -19,19 +19,19 @@ import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 
 public class MainActivity extends Activity {
-  private TextView    statusText  ;
-  private Button      recordButton;
-  private Button      playButton  ;
-  private AudioRecord recorder    ;
-  private AudioTrack  player      ;
-  private boolean      isRecording = false;
-  private boolean      isPlaying   = false;
-  private int          sampleRate  = 16000;
-  private final byte[] recordedData     = new byte[sampleRate * 2 * 60 * 15];
-  private int 	       recordedBytes    = 0;
-  private int 	       playbackPosition = 0;
+  private TextView statusText;
+  private Button recordButton;
+  private Button playButton;
+  private AudioRecord recorder;
+  private AudioTrack player;
+  private boolean isRecording = false;
+  private boolean isPlaying = false;
+  private int sampleRate = 16000;
+  private final byte[] recordedData = new byte[sampleRate * 2 * 60 * 15];
+  private int recordedBytes = 0;
+  private int playbackPosition = 0;
   private final Object lock = new Object();
-  private Thread  uiUpdateThread;
+  private Thread uiUpdateThread;
   private boolean uiUpdateRunning = true;
 
   private static final int PERMISSION_REQUEST_CODE = 200;
@@ -107,8 +107,8 @@ public class MainActivity extends Activity {
     int bytes;
     int pos;
     synchronized (lock) {
-      bytes = recordedBytes   ;
-      pos   = playbackPosition;
+      bytes = recordedBytes;
+      pos = playbackPosition;
     }
     float seconds = (float) bytes / (sampleRate * 2);
     String status = String.format("Bytes: %d\nDuration: %.2f sec\nPlayback Pos: %d", bytes, seconds, pos);
@@ -118,13 +118,19 @@ public class MainActivity extends Activity {
 
   private void startRecording() {
     try {
-      recorder = new AudioRecord(MediaRecorder.AudioSource.MIC, sampleRate, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT, AudioRecord.getMinBufferSize(sampleRate, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT));
+      recorder = new AudioRecord(MediaRecorder.AudioSource.MIC, sampleRate,
+          AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT,
+          AudioRecord.getMinBufferSize(sampleRate, AudioFormat.CHANNEL_IN_MONO,
+              AudioFormat.ENCODING_PCM_16BIT));
       recorder.startRecording();
       isRecording = true;
       recordButton.setText("Stop Recording");
 
       new Thread(() -> {
-	int offset = 0;
+        int offset;
+        synchronized (lock) {
+          offset = recordedBytes;
+        }
         int chunkSize = 8192;
         while (isRecording && offset < recordedData.length) {
           int read = recorder.read(recordedData, offset, Math.min(chunkSize, recordedData.length - offset));
@@ -146,7 +152,7 @@ public class MainActivity extends Activity {
     try {
       isRecording = false;
       if (recorder != null) {
-        recorder.stop   ();
+        recorder.stop();
         recorder.release();
         recorder = null;
       }
@@ -210,7 +216,7 @@ public class MainActivity extends Activity {
 
   private void resetBuffer() {
     synchronized (lock) {
-      recordedBytes    = 0;
+      recordedBytes = 0;
       playbackPosition = 0;
     }
     updateStatus();
