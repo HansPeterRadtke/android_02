@@ -1,4 +1,5 @@
 package myapp.app;
+import myapp.app.utils.ModelDownloader;
 
 import android.Manifest;
 import android.app.Activity;
@@ -92,10 +93,12 @@ public class MainActivity extends Activity {
       print("BUTTON: To Text pressed. Buffer reset requested.");
       resetBuffer();
     });
+
+    new Thread(() -> {ModelDownloader md = new ModelDownloader(this);}).start();
   }
 
-  private void print(String msg) {
-    statusText.setText(msg);
+  public void print(String msg) {
+    statusText.append(msg + "\n");
     statusText.invalidate();
   }
 
@@ -131,7 +134,7 @@ public class MainActivity extends Activity {
         runOnUiThread(() -> recordButton.setText("Start Recording"));
       }).start();
     } catch (Exception e) {
-      runOnUiThread(() -> print("EXCEPTION: " + e.toString()));
+      print("EXCEPTION: " + e.toString());
     }
   }
 
@@ -145,7 +148,7 @@ public class MainActivity extends Activity {
         recorder = null;
       }
     } catch (Exception e) {
-      runOnUiThread(() -> print("EXCEPTION: " + e.toString()));
+      print("EXCEPTION: " + e.toString());
     }
   }
 
@@ -190,7 +193,7 @@ public class MainActivity extends Activity {
         runOnUiThread(this::stopPlayback);
       }).start();
     } catch (Exception e) {
-      runOnUiThread(() -> print("EXCEPTION: " + e.toString()));
+      print("EXCEPTION: " + e.toString());
     }
   }
 
