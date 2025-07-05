@@ -1,0 +1,70 @@
+package myapp.app.utils;
+
+import myapp.app.MainActivity;
+
+import java.io.BufferedInputStream;
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.net.HttpURLConnection;
+import java.net.URL;
+
+public class ModelDownloader {
+  private final MainActivity main;
+
+  private static final String WHISPER_URL = "https://huggingface.co/onnx-community/whisper-tiny-en/resolve/main/whisper-tiny-en.onnx";
+  private static final String VITS_URL = "https://huggingface.co/adiwajshing/vits-ljspeech/resolve/main/vits_ljspeech.onnx";
+
+  public ModelDownloader(MainActivity main) {
+    this.main = main;
+    main.print("DOWNLOADER: Checking model files...");
+
+    try {
+      File whisperFile = new File(main.getFilesDir(), "whisper.onnx");
+      File vitsFile = new File(main.getFilesDir(), "vits.onnx");
+
+      if (!whisperFile.exists()) {
+        main.print("DOWNLOADER: Whisper model missing. Downloading...");
+        downloadFile(WHISPER_URL, whisperFile);
+      } else {
+        main.print("DOWNLOADER: Whisper model already present.");
+      }
+
+      if (!vitsFile.exists()) {
+        main.print("DOWNLOADER: VITS model missing. Downloading...");
+        downloadFile(VITS_URL, vitsFile);
+      } else {
+        main.print("DOWNLOADER: VITS model already present.");
+      }
+    } catch (Exception e) {
+      main.print("EXCEPTION: " + e.toString());
+    }
+  }
+
+  private void downloadFile(String urlString, File outFile) throws IOException {
+    URL url = new URL(urlString);
+    HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+    conn.connect();
+
+    if (conn.getResponseCode() != HttpURLConnection.HTTP_OK) {
+      throw new IOException("Server returned HTTP " + conn.getResponseCode());
+    }
+
+    InputStream input = new BufferedInputStream(conn.getInputStream());
+    FileOutputStream output = new FileOutputStream(outFile);
+
+    byte[] data = new byte[4096];
+    int count;
+    while ((count = input.read(data)) != -1) {
+      output.write(data, 0, count);
+    }
+
+    output.flush();
+    output.close();
+    input.close();
+    conn.disconnect();
+
+    main.print("DOWNLOADER: Finished downloading " + outFile.getName());
+  }
+}
