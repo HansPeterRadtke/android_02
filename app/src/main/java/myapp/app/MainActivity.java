@@ -1,4 +1,5 @@
 package myapp.app;
+import android.view.ViewGroup;
 import myapp.app.utils.ModelDownloader;
 
 import android.Manifest;
@@ -57,8 +58,13 @@ public class MainActivity extends Activity {
     layout.addView(toTextButton);
 
     statusText = new TextView(this);
+        statusText.setLayoutParams(new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
         statusText.setTextIsSelectable(true);
+        statusText.setSingleLine(false);
+        statusText.setMaxLines(Integer.MAX_VALUE);
     ScrollView scrollView = new ScrollView(this);
+        scrollView.setFillViewport(true);
+        scrollView.setLayoutParams(new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f));
     scrollView.addView(statusText);
     layout.addView(scrollView);
 
