@@ -57,6 +57,7 @@ public class MainActivity extends Activity {
     layout.addView(toTextButton);
 
     statusText = new TextView(this);
+        statusText.setTextIsSelectable(true);
     ScrollView scrollView = new ScrollView(this);
     scrollView.addView(statusText);
     layout.addView(scrollView);
@@ -94,7 +95,8 @@ public class MainActivity extends Activity {
       resetBuffer();
     });
 
-    new Thread(() -> {ModelDownloader md = new ModelDownloader(this);}).start();
+    ModelDownloader md = new ModelDownloader(this);
+        md.start();
   }
 
   public void print(String msg) {
