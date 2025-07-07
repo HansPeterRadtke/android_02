@@ -1,10 +1,14 @@
 package myapp.app.utils;
 
 import android.content.Context;
+
 import java.io.File;
+import java.io.FileInputStream;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
-import java.util.Arrays;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Scanner;
 
 public class WhisperRunner {
   private final Context context;
@@ -17,18 +21,18 @@ public class WhisperRunner {
     try {
       File encoderFile = new File(context.getFilesDir(), "whisper-encoder.onnx");
       File decoderFile = new File(context.getFilesDir(), "whisper-decoder.onnx");
-      File tokensFile  = new File(context.getFilesDir(), "whisper-tokens.txt");
+      File tokensFile = new File(context.getFilesDir(), "whisper-tokens.txt");
 
-      if (!encoderFile.exists() || !decoderFile.exists() || !tokensFile.exists()) {
-        return "ERROR: Whisper model files missing";
-      }
-
-      // NOTE: This is a placeholder
-      // Actual ONNX inference would go here using ONNX Runtime for Android or Sherpa-ONNX JNI
+      if (!encoderFile.exists()) return "ERROR: whisper-encoder.onnx missing";
+      if (!decoderFile.exists()) return "ERROR: whisper-decoder.onnx missing";
+      if (!tokensFile.exists()) return "ERROR: whisper-tokens.txt missing";
 
       float[] audioData = convertToFloat(audioBytes, byteLen);
+      List<String> vocab = loadVocabulary(tokensFile);
 
-      return "[TRANSCRIPTION PLACEHOLDER] " + audioData.length + " samples processed.";
+      // TODO: Implement ONNX loading, encoder execution, decoder loop, token output
+
+      return "OK: Prepared " + audioData.length + " samples, vocab size: " + vocab.size();
     } catch (Exception e) {
       return "EXCEPTION (WhisperRunner): " + e.toString();
     }
@@ -41,5 +45,15 @@ public class WhisperRunner {
       out[i] = bb.getShort() / 32768.0f;
     }
     return out;
+  }
+
+  private List<String> loadVocabulary(File file) throws Exception {
+    List<String> list = new ArrayList<>();
+    try (Scanner scanner = new Scanner(new FileInputStream(file))) {
+      while (scanner.hasNextLine()) {
+        list.add(scanner.nextLine());
+      }
+    }
+    return list;
   }
 }
