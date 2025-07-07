@@ -13,8 +13,10 @@ import java.net.URL;
 public class ModelDownloader extends Thread {
   private final MainActivity main;
 
-  private static final String WHISPER_URL = "https://huggingface.co/csukuangfj/sherpa-onnx-whisper-tiny.en/resolve/main/tiny.en-encoder.onnx";
-  private static final String VITS_URL    = "https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/vits-ljs.tar.bz2";
+  private static final String WHISPER_ENCODER_URL = "https://huggingface.co/csukuangfj/sherpa-onnx-whisper-tiny.en/resolve/main/tiny.en-encoder.onnx";
+  private static final String WHISPER_DECODER_URL = "https://huggingface.co/csukuangfj/sherpa-onnx-whisper-tiny.en/resolve/main/tiny.en-decoder.onnx";
+  private static final String WHISPER_TOKENS_URL  = "https://huggingface.co/csukuangfj/sherpa-onnx-whisper-tiny.en/resolve/main/tiny.en-tokens.txt";
+  private static final String VITS_URL            = "https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/vits-ljs.tar.bz2";
 
   public ModelDownloader(MainActivity main) {
     this.main = main;
@@ -24,21 +26,27 @@ public class ModelDownloader extends Thread {
   public void run() {
     main.print("DOWNLOADER: Checking model files...");
     try {
-      File whisperFile = new File(main.getFilesDir(), "whisper.onnx");
-      File vitsFile    = new File(main.getFilesDir(), "vits.onnx"   );
+      File whisperEnc = new File(main.getFilesDir(), "whisper-encoder.onnx");
+      File whisperDec = new File(main.getFilesDir(), "whisper-decoder.onnx");
+      File whisperTok = new File(main.getFilesDir(), "whisper-tokens.txt");
+      File vitsFile   = new File(main.getFilesDir(), "vits.onnx");
 
-      if (!whisperFile.exists()) {
-        main.print("DOWNLOADER: Whisper model missing. Downloading...");
-        downloadFile(WHISPER_URL, whisperFile);
-      } else {
-        main.print("DOWNLOADER: Whisper model already present.");
+      if (!whisperEnc.exists()) {
+        main.print("DOWNLOADER: Whisper encoder missing. Downloading...");
+        downloadFile(WHISPER_ENCODER_URL, whisperEnc);
+      }
+      if (!whisperDec.exists()) {
+        main.print("DOWNLOADER: Whisper decoder missing. Downloading...");
+        downloadFile(WHISPER_DECODER_URL, whisperDec);
+      }
+      if (!whisperTok.exists()) {
+        main.print("DOWNLOADER: Whisper tokens missing. Downloading...");
+        downloadFile(WHISPER_TOKENS_URL, whisperTok);
       }
 
       if (!vitsFile.exists()) {
         main.print("DOWNLOADER: VITS model missing. Downloading...");
         downloadFile(VITS_URL, vitsFile);
-      } else {
-        main.print("DOWNLOADER: VITS model already present.");
       }
     } catch (Exception e) {
       main.print("EXCEPTION: " + e.toString());
