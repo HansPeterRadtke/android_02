@@ -13,8 +13,8 @@ import java.net.URL;
 public class ModelDownloader extends Thread {
   private final MainActivity main;
 
-  private static final String WHISPER_URL = "https://huggingface.co/onnx-community/whisper-tiny-en/resolve/main/whisper-tiny-en.onnx";
-  private static final String VITS_URL    = "https://huggingface.co/adiwajshing/vits-ljspeech/resolve/main/vits_ljspeech.onnx";
+  private static final String WHISPER_URL = "https://huggingface.co/csukuangfj/sherpa-onnx-whisper-tiny.en/resolve/main/tiny.en-encoder.onnx";
+  private static final String VITS_URL    = "https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/vits-ljs.tar.bz2";
 
   public ModelDownloader(MainActivity main) {
     this.main = main;
@@ -55,8 +55,6 @@ public class ModelDownloader extends Thread {
     if (code != HttpURLConnection.HTTP_OK) {
       main.print("Server did not returned HTTP_OK!");
       main.print("responseCode = " + String.valueOf(code));
-      pause(1000);
-      main.print("tick");
       return;
     }
 
@@ -65,9 +63,13 @@ public class ModelDownloader extends Thread {
 
     byte[] data = new byte[4096];
     int count;
+    int i = 0;
     while ((count = input.read(data)) != -1) {
       output.write(data, 0, count);
-      main.print("Downloaded and saved " + count + " bytes; ");
+      if((i % 100) == 0) {
+        main.print("Downloaded and saved " + count + " bytes; ");
+      }
+      i++;
     }
 
     output.flush();
