@@ -2,7 +2,6 @@ package myapp.app.utils;
 
 import myapp.app.MainActivity;
 
-import java.lang.Thread;
 import java.io.BufferedInputStream;
 import java.io.File;
 import java.io.FileOutputStream;
@@ -11,9 +10,7 @@ import java.io.InputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
 
-
-
-public class ModelDownloader {
+public class ModelDownloader extends Thread {
   private final MainActivity main;
 
   private static final String WHISPER_URL = "https://huggingface.co/onnx-community/whisper-tiny-en/resolve/main/whisper-tiny-en.onnx";
@@ -21,8 +18,11 @@ public class ModelDownloader {
 
   public ModelDownloader(MainActivity main) {
     this.main = main;
-    main.print("DOWNLOADER: Checking model files...");
+  }
 
+  @Override
+  public void run() {
+    main.print("DOWNLOADER: Checking model files...");
     try {
       File whisperFile = new File(main.getFilesDir(), "whisper.onnx");
       File vitsFile    = new File(main.getFilesDir(), "vits.onnx"   );
@@ -77,6 +77,7 @@ public class ModelDownloader {
 
     main.print("DOWNLOADER: Finished downloading " + outFile.getName());
   }
+
   public void pause(int ms) {
     try {
       Thread.sleep(ms);
@@ -85,4 +86,3 @@ public class ModelDownloader {
     }
   }
 }
-

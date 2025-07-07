@@ -58,13 +58,13 @@ public class MainActivity extends Activity {
     layout.addView(toTextButton);
 
     statusText = new TextView(this);
-        statusText.setLayoutParams(new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
-        statusText.setTextIsSelectable(true);
-        statusText.setSingleLine(false);
-        statusText.setMaxLines(Integer.MAX_VALUE);
+    statusText.setLayoutParams(new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+    statusText.setTextIsSelectable(true);
+    statusText.setSingleLine(false);
+    statusText.setMaxLines(Integer.MAX_VALUE);
     ScrollView scrollView = new ScrollView(this);
-        scrollView.setFillViewport(true);
-        scrollView.setLayoutParams(new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f));
+    scrollView.setFillViewport(true);
+    scrollView.setLayoutParams(new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f));
     scrollView.addView(statusText);
     layout.addView(scrollView);
 
@@ -73,10 +73,8 @@ public class MainActivity extends Activity {
     print("APP: onCreate() called. App initialized.");
 
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-      if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO)
-          != PackageManager.PERMISSION_GRANTED) {
-        ActivityCompat.requestPermissions(this,
-            new String[]{Manifest.permission.RECORD_AUDIO}, PERMISSION_REQUEST_CODE);
+      if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+        ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.RECORD_AUDIO}, PERMISSION_REQUEST_CODE);
       }
     }
 
@@ -102,12 +100,11 @@ public class MainActivity extends Activity {
     });
 
     ModelDownloader md = new ModelDownloader(this);
-        md.start();
+    md.start();
   }
 
   public void print(String msg) {
-    statusText.append(msg + "\n");
-    statusText.invalidate();
+    runOnUiThread(() -> { statusText.append(msg + "\n"); statusText.invalidate(); });
   }
 
   private void startRecording() {
@@ -136,7 +133,7 @@ public class MainActivity extends Activity {
             }
             float seconds = (float) offset / (sampleRate * 2);
             String status = String.format("RECORD: Bytes: %d | Duration: %.2f sec", offset, seconds);
-            runOnUiThread(() -> print(status));
+            print(status);
           }
         }
         runOnUiThread(() -> recordButton.setText("Start Recording"));
