@@ -79,12 +79,12 @@ public class ModelDownloader extends Thread {
     InputStream      input  = new BufferedInputStream(conn.getInputStream());
     FileOutputStream output = new FileOutputStream   (outFile);
 
-    byte[] data = new byte[4096];
+    byte[] data = new byte[16384];
     int count;
     int i = 0;
     while ((count = input.read(data)) != -1) {
       output.write(data, 0, count);
-      if((i % 100) == 0) {
+      if((i % 1000) == 0) {
         main.print("Downloaded and saved " + count + " bytes; ");
       }
       i++;

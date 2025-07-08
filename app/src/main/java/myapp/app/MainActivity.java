@@ -22,18 +22,18 @@ import android.content.pm.PackageManager;
 import androidx.core.content.ContextCompat;
 
 public class MainActivity extends Activity {
-  private TextView     statusText  ;
-  private Button       recordButton;
-  private Button       playButton  ;
-  private AudioRecord  recorder    ;
-  private AudioTrack   player      ;
-  private boolean      isRecording  = false;
-  private boolean      isPlaying    = false;
-  private int          sampleRate   = 16000;
-  private final byte[] recordedData     = new byte[sampleRate * 2 * 60 * 15];
-  private int          recordedBytes    = 0;
-  private int          playbackPosition = 0;
-  private final Object lock             = new Object();
+  private TextView      statusText  ;
+  private Button        recordButton;
+  private Button        playButton  ;
+  private AudioRecord   recorder    ;
+  private AudioTrack    player      ;
+  private boolean       isRecording  = false;
+  private boolean       isPlaying    = false;
+  private int           sampleRate   = 16000;
+  private final byte[]  recordedData     = new byte[sampleRate * 2 * 60 * 15];
+  private int           recordedBytes    = 0;
+  private int           playbackPosition = 0;
+  private final Object  lock             = new Object();
   private WhisperRunner whisperRunner;
 
   private static final int PERMISSION_REQUEST_CODE = 200;
@@ -95,6 +95,8 @@ public class MainActivity extends Activity {
     });
 
     toTextButton.setOnClickListener(v -> {
+      print("Running whisper now");
+      print(this.whisperRunner.transcribe(this.recordedData, recordedBytes));
       print("BUTTON: To Text pressed. Buffer reset requested.");
       resetBuffer();
     });

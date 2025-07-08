@@ -31,11 +31,11 @@ public class WhisperRunner {
     try {
       File encoderFile = new File(main.getFilesDir(), "whisper-encoder.onnx");
       File decoderFile = new File(main.getFilesDir(), "whisper-decoder.onnx");
-      File tokensFile = new File(main.getFilesDir(), "whisper-tokens.txt");
+      File tokensFile  = new File(main.getFilesDir(), "whisper-tokens.txt"  );
 
       if (!encoderFile.exists()) return "ERROR: whisper-encoder.onnx missing";
       if (!decoderFile.exists()) return "ERROR: whisper-decoder.onnx missing";
-      if (!tokensFile.exists()) return "ERROR: whisper-tokens.txt missing";
+      if (!tokensFile .exists()) return "ERROR: whisper-tokens.txt missing"  ;
 
       main.print("TRANSCRIBER: All required model files found.");
 
@@ -44,17 +44,26 @@ public class WhisperRunner {
       main.print("TRANSCRIBER: Audio and vocabulary loaded. Starting session...");
 
       env = OrtEnvironment.getEnvironment();
+      main.print("TRANSCRIBER: after getEnvironment");
       encoderSession = env.createSession(encoderFile.getAbsolutePath(), new OrtSession.SessionOptions());
+      main.print("TRANSCRIBER: after env.createSession");
 
       float[][] features = new float[1][audioData.length];
       System.arraycopy(audioData, 0, features[0], 0, audioData.length);
+      main.print("TRANSCRIBER: after System.arraycopy");
 
       OnnxTensor inputTensor = OnnxTensor.createTensor(env, features);
+      main.print("TRANSCRIBER: after OnnxTensor.createTensor");
       Result result = encoderSession.run(java.util.Collections.singletonMap("audio_features", inputTensor));
+      main.print("TRANSCRIBER: after encoderSession.run");
+      main.print("TRANSCRIBER: result:" + result.toString());
 
       inputTensor.close();
+      main.print("TRANSCRIBER: after inputTensor.close");
       encoderSession.close();
+      main.print("TRANSCRIBER: after encoderSession.close");
       env.close();
+      main.print("TRANSCRIBER: after env.close");
 
       main.print("TRANSCRIBER: Encoder inference done. Output processed.");
       return "Whisper encoder inference executed. Output size: " + result.toString();
@@ -65,6 +74,7 @@ public class WhisperRunner {
     } finally {
       try { if (encoderSession != null) encoderSession.close(); } catch (Exception ignored) {}
       try { if (env != null) env.close(); } catch (Exception ignored) {}
+      return "SUCCESS";
     }
   }
 
