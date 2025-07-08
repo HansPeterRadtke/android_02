@@ -15,8 +15,8 @@ public class ModelDownloader extends Thread {
 
   private static final String WHISPER_ENCODER_URL = "https://huggingface.co/csukuangfj/sherpa-onnx-whisper-tiny.en/resolve/main/tiny.en-encoder.onnx";
   private static final String WHISPER_DECODER_URL = "https://huggingface.co/csukuangfj/sherpa-onnx-whisper-tiny.en/resolve/main/tiny.en-decoder.onnx";
-  private static final String WHISPER_TOKENS_URL  = "https://huggingface.co/csukuangfj/sherpa-onnx-whisper-tiny.en/resolve/main/tiny.en-tokens.txt";
-  private static final String VITS_URL            = "https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/vits-ljs.tar.bz2";
+  private static final String WHISPER_TOKENS_URL  = "https://huggingface.co/csukuangfj/sherpa-onnx-whisper-tiny.en/resolve/main/tiny.en-tokens.txt"  ;
+  private static final String VITS_URL            = "https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/vits-ljs.tar.bz2"            ;
 
   public ModelDownloader(MainActivity main) {
     this.main = main;
@@ -28,8 +28,8 @@ public class ModelDownloader extends Thread {
     try {
       File whisperEnc = new File(main.getFilesDir(), "whisper-encoder.onnx");
       File whisperDec = new File(main.getFilesDir(), "whisper-decoder.onnx");
-      File whisperTok = new File(main.getFilesDir(), "whisper-tokens.txt");
-      File vitsFile   = new File(main.getFilesDir(), "vits.onnx");
+      File whisperTok = new File(main.getFilesDir(), "whisper-tokens.txt"  );
+      File vitsFile   = new File(main.getFilesDir(), "vits.onnx"           );
 
       if (!whisperEnc.exists()) {
         main.print("DOWNLOADER: Whisper encoder missing. Downloading...");
