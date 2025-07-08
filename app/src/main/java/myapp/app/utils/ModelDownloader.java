@@ -34,19 +34,29 @@ public class ModelDownloader extends Thread {
       if (!whisperEnc.exists()) {
         main.print("DOWNLOADER: Whisper encoder missing. Downloading...");
         downloadFile(WHISPER_ENCODER_URL, whisperEnc);
+      } else {
+        main.print("DOWNLOADER: Whisper encoder found.");
       }
+
       if (!whisperDec.exists()) {
         main.print("DOWNLOADER: Whisper decoder missing. Downloading...");
         downloadFile(WHISPER_DECODER_URL, whisperDec);
+      } else {
+        main.print("DOWNLOADER: Whisper decoder found.");
       }
+
       if (!whisperTok.exists()) {
         main.print("DOWNLOADER: Whisper tokens missing. Downloading...");
         downloadFile(WHISPER_TOKENS_URL, whisperTok);
+      } else {
+        main.print("DOWNLOADER: Whisper tokens found.");
       }
 
       if (!vitsFile.exists()) {
         main.print("DOWNLOADER: VITS model missing. Downloading...");
         downloadFile(VITS_URL, vitsFile);
+      } else {
+        main.print("DOWNLOADER: VITS model found.");
       }
     } catch (Exception e) {
       main.print("EXCEPTION: " + e.toString());

@@ -1,40 +1,40 @@
 package myapp.app;
-import android.view.ViewGroup;
 import myapp.app.utils.ModelDownloader;
+import myapp.app.utils.WhisperRunner  ;
 
 import android.Manifest;
 import android.app.Activity;
-import android.content.pm.PackageManager;
+import android.view.ViewGroup;
+import android.widget.TextView;
+import android.media.AudioTrack;
 import android.media.AudioFormat;
 import android.media.AudioRecord;
-import android.media.AudioTrack;
-import android.media.MediaRecorder;
 import android.media.AudioManager;
+import android.media.MediaRecorder;
 import android.os.Build;
 import android.os.Bundle;
 import android.view.View;
 import android.widget.Button;
-import android.widget.LinearLayout;
 import android.widget.ScrollView;
-import android.widget.TextView;
+import android.widget.LinearLayout;
 import androidx.core.app.ActivityCompat;
+import android.content.pm.PackageManager;
 import androidx.core.content.ContextCompat;
 
 public class MainActivity extends Activity {
-  private TextView statusText;
-  private Button recordButton;
-  private Button playButton;
-  private AudioRecord recorder;
-  private AudioTrack player;
-  private boolean isRecording = false;
-  private boolean isPlaying = false;
-  private int sampleRate = 16000;
-  private final byte[] recordedData = new byte[sampleRate * 2 * 60 * 15];
-  private int recordedBytes = 0;
-  private int playbackPosition = 0;
-  private final Object lock = new Object();
-  private Thread uiUpdateThread;
-  private boolean uiUpdateRunning = true;
+  private TextView     statusText  ;
+  private Button       recordButton;
+  private Button       playButton  ;
+  private AudioRecord  recorder    ;
+  private AudioTrack   player      ;
+  private boolean      isRecording  = false;
+  private boolean      isPlaying    = false;
+  private int          sampleRate   = 16000;
+  private final byte[] recordedData     = new byte[sampleRate * 2 * 60 * 15];
+  private int          recordedBytes    = 0;
+  private int          playbackPosition = 0;
+  private final Object lock             = new Object();
+  private WhisperRunner whisperRunner;
 
   private static final int PERMISSION_REQUEST_CODE = 200;
 
@@ -99,7 +99,9 @@ public class MainActivity extends Activity {
       resetBuffer();
     });
 
+    this.whisperRunner = new WhisperRunner  (this);
     ModelDownloader md = new ModelDownloader(this);
+
     md.start();
   }
 
