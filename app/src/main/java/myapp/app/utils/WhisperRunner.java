@@ -72,9 +72,16 @@ public class WhisperRunner {
     } catch (Exception e) {
       return "Exception: " + e.toString();
     } finally {
-      try { if (encoderSession != null) encoderSession.close(); } catch (Exception ignored) {}
-      try { if (env != null) env.close(); } catch (Exception ignored) {}
-      return "SUCCESS";
+      try {
+        if(encoderSession != null) encoderSession.close();
+        } catch (Exception e) {
+          return e.toString();
+        }
+      try {
+        if(env != null) env.close();
+      } catch (Exception e) {
+        return e.toString();
+      }
     }
   }
 
