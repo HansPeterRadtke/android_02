@@ -4,27 +4,27 @@ import org.vosk.Model;
 import org.vosk.Recognizer;
 
 import android.Manifest;
-import android.app.Activity;
-import android.view.ViewGroup;
-import android.widget.TextView;
-import android.media.AudioTrack;
-import android.media.AudioFormat;
-import android.media.AudioRecord;
-import android.media.AudioManager;
-import android.media.MediaRecorder;
-import android.os.Build;
+import android.os.Build ;
 import android.os.Bundle;
-import android.view.View;
-import android.widget.Button;
-import android.widget.ScrollView;
+import android.app.Activity;
+import android.view.View     ;
+import android.view.ViewGroup;
+import android.widget.Button      ;
+import android.widget.TextView    ;
+import android.widget.ScrollView  ;
 import android.widget.LinearLayout;
-import androidx.core.app.ActivityCompat;
+import android.media.AudioTrack   ;
+import android.media.AudioFormat  ;
+import android.media.AudioRecord  ;
+import android.media.AudioManager ;
+import android.media.MediaRecorder;
 import android.content.pm.PackageManager;
+import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
+
 
 public class MainActivity extends Activity {
   private TextView      statusText  ;
-  private Recognizer recognizer;
   private Button        recordButton;
   private Button        playButton  ;
   private AudioRecord   recorder    ;
@@ -36,6 +36,7 @@ public class MainActivity extends Activity {
   private int           recordedBytes    = 0;
   private int           playbackPosition = 0;
   private final Object  lock             = new Object();
+  private Recognizer    recognizer;
 
   private static final int PERMISSION_REQUEST_CODE = 200;
 
@@ -59,26 +60,29 @@ public class MainActivity extends Activity {
     layout.addView(toTextButton);
 
     statusText = new TextView(this);
-    statusText.setLayoutParams(new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+    statusText.setLayoutParams    (new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
     statusText.setTextIsSelectable(true);
-    statusText.setSingleLine(false);
-    statusText.setMaxLines(Integer.MAX_VALUE);
+    statusText.setSingleLine      (false);
+    statusText.setMaxLines        (Integer.MAX_VALUE);
     ScrollView scrollView = new ScrollView(this);
     scrollView.setFillViewport(true);
     scrollView.setLayoutParams(new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f));
-    scrollView.addView(statusText);
+    scrollView.addView        (statusText);
     layout.addView(scrollView);
 
     setContentView(layout);
 
-    print("APP: onCreate() called. App initialized.");
+    print("(onCreate) called. ContentView initialized.");
 
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
       if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+        print("(onCreate) Requesting permission");
         ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.RECORD_AUDIO}, PERMISSION_REQUEST_CODE);
       }
     }
+    print("(onCreate) permission checked");
 
+    print("(onCreate) creating recordbutton");
     recordButton.setOnClickListener(v -> {
       if (!isRecording) {
         startRecording();
@@ -87,6 +91,7 @@ public class MainActivity extends Activity {
       }
     });
 
+    print("(onCreate) creating playbutton");
     playButton.setOnClickListener(v -> {
       if (!isPlaying) {
         startPlayback();
@@ -95,22 +100,27 @@ public class MainActivity extends Activity {
       }
     });
 
+    print("(onCreate) creating totextbutton");
     toTextButton.setOnClickListener(v -> {
-      print("Running whisper now");
-print(this.recognizer.getResult());
+      print("Running the recognizer now:");
+      print(this.recognizer.getResult());
       print("BUTTON: To Text pressed. Buffer reset requested.");
       resetBuffer();
     });
 
-    ModelDownloader md = new ModelDownloader(this);
-
     try {
-      Model model = new Model(getCacheDir().getAbsolutePath() + "/vosk-model-small-en-us-0.15");
-      this.recognizer = new Recognizer(model, 16000.0f);
+      print("(onCreate) creating ModelDownloader");
+      ModelDownloader md    = new ModelDownloader(this);
+      print("(onCreate) creating Model");
+      Model           model = new Model(getCacheDir().getAbsolutePath() + "/vosk-model-small-en-us-0.15");
+      print("(onCreate) creating Recognizer");
+      this.recognizer       = new Recognizer(model, 16000.0f);
+      print("(onCreate) creating Model");
+      md.start();
     } catch (Exception e) {
       print("EXCEPTION: " + e.toString());
     }
-    md.start();
+    print("(onCreate) all done");
   }
 
   public void print(String msg) {
@@ -158,7 +168,7 @@ print(this.recognizer.getResult());
       print("RECORD: Stop recording requested.");
       isRecording = false;
       if (recorder != null) {
-        recorder.stop();
+        recorder.stop   ();
         recorder.release();
         recorder = null;
       }
@@ -173,11 +183,8 @@ print(this.recognizer.getResult());
       synchronized (lock) {
         if (playbackPosition >= recordedBytes) playbackPosition = 0;
       }
-      int bufferSize = AudioTrack.getMinBufferSize(sampleRate,
-          AudioFormat.CHANNEL_OUT_MONO, AudioFormat.ENCODING_PCM_16BIT);
-      player = new AudioTrack(AudioManager.STREAM_MUSIC, sampleRate,
-          AudioFormat.CHANNEL_OUT_MONO, AudioFormat.ENCODING_PCM_16BIT,
-          bufferSize, AudioTrack.MODE_STREAM);
+      int bufferSize = AudioTrack.getMinBufferSize(sampleRate, AudioFormat.CHANNEL_OUT_MONO, AudioFormat.ENCODING_PCM_16BIT);
+      player = new AudioTrack(AudioManager.STREAM_MUSIC, sampleRate, AudioFormat.CHANNEL_OUT_MONO, AudioFormat.ENCODING_PCM_16BIT, bufferSize, AudioTrack.MODE_STREAM);
       player.play();
       isPlaying = true;
       playButton.setText("Stop Playback");
