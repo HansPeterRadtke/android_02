@@ -22,6 +22,8 @@ import android.content.pm.PackageManager;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 
+import java.io.File;
+
 
 public class MainActivity extends Activity {
   private TextView      statusText  ;
@@ -102,20 +104,33 @@ public class MainActivity extends Activity {
 
     print("(onCreate) creating totextbutton");
     toTextButton.setOnClickListener(v -> {
-      print("Running the recognizer now:");
-      print(this.recognizer.getResult());
-      print("BUTTON: To Text pressed. Buffer reset requested.");
-      resetBuffer();
+      try {
+        String path = (getCacheDir() + "/vosk-model-small-en-us-0.15");
+        print("(onCreate) creating Model from " + path);
+        File file = new File(path);
+        if(file.exists()) {
+          print("And yes, it exists!!");
+        }
+        else {
+          print("oh, well, it does NOT exist ...");
+        }
+//        Model           model = new Model(path);
+        print("(onCreate) creating Recognizer");
+//        this.recognizer       = new Recognizer(model, 16000.0f);
+        print("(onCreate) creating Model");
+        print("Running the recognizer now:");
+//        print(this.recognizer.getResult());
+        print("BUTTON: To Text pressed. Buffer reset requested.");
+        resetBuffer();
+      } catch (Exception e) {
+        print("EXCEPTION: " + e.toString());
+      }
     });
 
     try {
       print("(onCreate) creating ModelDownloader");
       ModelDownloader md    = new ModelDownloader(this);
-      print("(onCreate) creating Model");
-      Model           model = new Model(getCacheDir().getAbsolutePath() + "/vosk-model-small-en-us-0.15");
-      print("(onCreate) creating Recognizer");
-      this.recognizer       = new Recognizer(model, 16000.0f);
-      print("(onCreate) creating Model");
+      print("(onCreate) starting ModelDownloader");
       md.start();
     } catch (Exception e) {
       print("EXCEPTION: " + e.toString());
