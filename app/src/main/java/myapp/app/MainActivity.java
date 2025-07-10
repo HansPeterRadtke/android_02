@@ -1,6 +1,7 @@
 package myapp.app;
 import myapp.app.utils.ModelDownloader;
-import myapp.app.utils.WhisperRunner  ;
+import org.vosk.Model;
+import org.vosk.Recognizer;
 
 import android.Manifest;
 import android.app.Activity;
@@ -23,6 +24,7 @@ import androidx.core.content.ContextCompat;
 
 public class MainActivity extends Activity {
   private TextView      statusText  ;
+  private Recognizer recognizer;
   private Button        recordButton;
   private Button        playButton  ;
   private AudioRecord   recorder    ;
@@ -34,7 +36,6 @@ public class MainActivity extends Activity {
   private int           recordedBytes    = 0;
   private int           playbackPosition = 0;
   private final Object  lock             = new Object();
-  private WhisperRunner whisperRunner;
 
   private static final int PERMISSION_REQUEST_CODE = 200;
 
@@ -96,14 +97,19 @@ public class MainActivity extends Activity {
 
     toTextButton.setOnClickListener(v -> {
       print("Running whisper now");
-      print(this.whisperRunner.transcribe(this.recordedData, recordedBytes));
+print(this.recognizer.getResult());
       print("BUTTON: To Text pressed. Buffer reset requested.");
       resetBuffer();
     });
 
-    this.whisperRunner = new WhisperRunner  (this);
     ModelDownloader md = new ModelDownloader(this);
 
+    try {
+      Model model = new Model(getCacheDir().getAbsolutePath() + "/vosk-model-small-en-us-0.15");
+      this.recognizer = new Recognizer(model, 16000.0f);
+    } catch (Exception e) {
+      print("EXCEPTION: " + e.toString());
+    }
     md.start();
   }
 

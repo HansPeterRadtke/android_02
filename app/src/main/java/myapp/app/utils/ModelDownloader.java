@@ -5,11 +5,13 @@ import myapp.app.MainActivity;
 import java.io.*;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipInputStream;
 
 public class ModelDownloader extends Thread {
   private final MainActivity main;
 
-  private static final String WHISPER_CPP_URL = "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/models/ggml-tiny.en.bin";
+  private static final String VOSK_MODEL_URL = "https://alphacephei.com/vosk/models/vosk-model-small-en-us-0.15.zip";
 
   public ModelDownloader(MainActivity main) {
     this.main = main;
@@ -19,17 +21,16 @@ public class ModelDownloader extends Thread {
   public void run() {
     main.print("DOWNLOADER: Checking model files...");
     try {
-      File modelDir = new File(main.getFilesDir(), "models");
+      File modelDir = new File(main.getCacheDir(), "vosk-model-small-en-us-0.15");
       if (!modelDir.exists()) {
         modelDir.mkdirs();
-      }
-
-      File whisperCppModel = new File(modelDir, "ggml-tiny.en.bin");
-      if (!whisperCppModel.exists()) {
-        main.print("DOWNLOADER: Whisper.cpp model missing. Downloading...");
-        downloadFile(WHISPER_CPP_URL, whisperCppModel);
+        File zipFile = new File(main.getCacheDir(), "vosk-model.zip");
+        main.print("DOWNLOADER: Vosk model missing. Downloading...");
+        downloadFile(VOSK_MODEL_URL, zipFile);
+        unzip(zipFile, main.getCacheDir());
+        zipFile.delete();
       } else {
-        main.print("DOWNLOADER: Whisper.cpp model found.");
+        main.print("DOWNLOADER: Vosk model found.");
       }
     } catch (Exception e) {
       main.print("EXCEPTION: " + e.toString());
@@ -69,6 +70,28 @@ public class ModelDownloader extends Thread {
     conn.disconnect();
 
     main.print("DOWNLOADER: Finished downloading " + outFile.getName());
+  }
+
+  private void unzip(File zipFile, File targetDir) throws IOException {
+    ZipInputStream zis = new ZipInputStream(new FileInputStream(zipFile));
+    ZipEntry ze;
+    byte[] buffer = new byte[1024];
+    while ((ze = zis.getNextEntry()) != null) {
+      File newFile = new File(targetDir, ze.getName());
+      if (ze.isDirectory()) {
+        newFile.mkdirs();
+        continue;
+      }
+      new File(newFile.getParent()).mkdirs();
+      FileOutputStream fos = new FileOutputStream(newFile);
+      int len;
+      while ((len = zis.read(buffer)) > 0) {
+        fos.write(buffer, 0, len);
+      }
+      fos.close();
+    }
+    zis.closeEntry();
+    zis.close();
   }
 
   public void pause(int ms) {
