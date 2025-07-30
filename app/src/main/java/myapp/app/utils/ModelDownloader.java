@@ -11,7 +11,7 @@ import java.util.zip.ZipInputStream;
 public class ModelDownloader extends Thread {
   private final MainActivity main;
 
-  private static final String VOSK_MODEL_URL = "https://alphacephei.com/vosk/models/vosk-model-small-en-us-0.15.zip";
+  private static final String VOSK_MODEL_URL = "https://alphacephei.com/vosk/models/vosk-model-en-us-0.22-lgraph.zip";
 
   public ModelDownloader(MainActivity main) {
     this.main = main;
@@ -21,7 +21,7 @@ public class ModelDownloader extends Thread {
   public void run() {
     main.print("DOWNLOADER: Checking model files...");
     try {
-      File modelDir = new File(main.getCacheDir(), "vosk-model-small-en-us-0.15");
+      File modelDir = new File(main.getCacheDir(), "vosk-model-en-us-0.22-lgraph");
       if (!modelDir.exists()) {
         modelDir.mkdirs();
         File zipFile = new File(main.getCacheDir(), "vosk-model.zip");

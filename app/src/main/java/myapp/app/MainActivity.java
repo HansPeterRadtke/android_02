@@ -105,7 +105,7 @@ public class MainActivity extends Activity {
     print("(onCreate) creating totextbutton");
     toTextButton.setOnClickListener(v -> {
       try {
-        String path = (getCacheDir() + "/vosk-model-small-en-us-0.15");
+        String path = (getCacheDir() + "/vosk-model-en-us-0.22-lgraph");
         print("(onCreate) creating Model from " + path);
         File file = new File(path);
         if(file.exists()) {
@@ -114,7 +114,7 @@ public class MainActivity extends Activity {
         else {
           print("oh, well, it does NOT exist ...");
         }
-//        Model           model = new Model(path);
+        Model           model = new Model(path);
         print("(onCreate) creating Recognizer");
 //        this.recognizer       = new Recognizer(model, 16000.0f);
         print("(onCreate) creating Model");
