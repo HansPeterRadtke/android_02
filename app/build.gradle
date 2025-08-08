@@ -1,51 +1,39 @@
-buildscript {
-    repositories {
-        google()
-        mavenCentral()
-    }
-    dependencies {
-        classpath "com.android.tools.build:gradle:7.0.4"
-    }
-}
 plugins {
-    id 'com.android.application'
+  id 'com.android.application'
 }
-allprojects {
-    repositories {
-        google()
-        mavenCentral()
-    }
-}
-dependencies {
-    implementation("org.jetbrains.kotlin:kotlin-stdlib:1.8.10")
-    implementation('androidx.core:core:1.12.0')
-    implementation('com.alphacephei:vosk-android:0.3.47') {
-        exclude group: 'net.java.dev.jna', module: 'jna'
-    }
-}
+
 android {
-    namespace 'myapp.app'
-    compileSdk 34
-    defaultConfig {
-        applicationId "myapp.app"
-        minSdk 21
-        targetSdk 34
-    }
-    buildTypes {
-        release {
-            minifyEnabled false
-        }
-    }
+  namespace    'myapp.app'
+  compileSdk   34
 
-    sourceSets {
-        main {
-            jniLibs.srcDirs = ['src/main/jniLibs']
-        }
-    }
+  defaultConfig {
+    applicationId "myapp.app"
+    minSdk        21
+    targetSdk     34
+  }
 
-    packagingOptions {
-        resources {
-            excludes += ['META-INF/LGPL2.1']
-        }
+  buildTypes {
+    release {
+      minifyEnabled false
     }
+  }
+
+  sourceSets {
+    main {
+      jniLibs.srcDirs = ['src/main/jniLibs']
+    }
+  }
+
+  packagingOptions {
+    resources {
+      excludes    += ['META-INF/LGPL2.1']
+      pickFirsts  += ['**/libvosk.so']
+    }
+  }
+}
+
+dependencies {
+  implementation("org.jetbrains.kotlin:kotlin-stdlib:1.8.10")
+  implementation("androidx.core:core:1.12.0")
+  implementation("com.alphacephei:vosk-android:0.3.47")
 }

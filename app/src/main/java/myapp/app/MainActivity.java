@@ -114,12 +114,19 @@ public class MainActivity extends Activity {
         else {
           print("oh, well, it does NOT exist ...");
         }
-        Model           model = new Model(path);
+        Model model     = new Model(path);
         print("(onCreate) creating Recognizer");
-//        this.recognizer       = new Recognizer(model, 16000.0f);
+        this.recognizer = new Recognizer(model, 16000.0f);
         print("(onCreate) creating Model");
         print("Running the recognizer now:");
-//        print(this.recognizer.getResult());
+        synchronized (lock) {
+          if (recordedBytes > 0) {
+            recognizer.acceptWaveForm(recordedData, recordedBytes);
+            print(recognizer.getFinalResult());
+          } else {
+            print("No recorded audio to process.");
+          }
+        }
         print("BUTTON: To Text pressed. Buffer reset requested.");
         resetBuffer();
       } catch (Exception e) {
