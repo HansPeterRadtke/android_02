@@ -30,10 +30,14 @@ public class MainActivity extends Activity {
   private Button        recordButton;
   private Button        playButton  ;
   private Button        readTextButton;
+  private Button        liveButton  ;
   private AudioRecord   recorder    ;
   private AudioTrack    player      ;
+  private AudioRecord   liveRecorder;
+  private Thread        liveThread  ;
   private boolean       isRecording  = false;
   private boolean       isPlaying    = false;
+  private boolean       isLive       = false;
   private int           sampleRate   = 16000;
   private final byte[]  recordedData     = new byte[sampleRate * 2 * 60 * 15];
   private int           recordedBytes    = 0;
@@ -67,6 +71,10 @@ public class MainActivity extends Activity {
     toTextButton.setText("To Text");
     layout.addView(toTextButton);
 
+    liveButton = new Button(this);
+    liveButton.setText("Start Live Transcription");
+    layout.addView(liveButton);
+
     statusText = new TextView(this);
     statusText.setLayoutParams    (new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
     statusText.setTextIsSelectable(true);
@@ -87,6 +95,7 @@ public class MainActivity extends Activity {
     }
 
     recordButton.setOnClickListener(v -> {
+      if (isLive) { print("Live transcription running. Stop it first."); return; }
       if (!isRecording) {
         startRecording();
       } else {
@@ -95,6 +104,7 @@ public class MainActivity extends Activity {
     });
 
     playButton.setOnClickListener(v -> {
+      if (isLive) { print("Live transcription running. Stop it first."); return; }
       if (!isPlaying) {
         startPlayback();
       } else {
@@ -136,6 +146,14 @@ public class MainActivity extends Activity {
       }
     });
 
+    liveButton.setOnClickListener(v -> {
+      if (!isLive) {
+        startLiveTranscription();
+      } else {
+        stopLiveTranscription();
+      }
+    });
+
     print("(onCreate) Creating ModelDownloader");
     ModelDownloader md = new ModelDownloader(this);
     print("(onCreate) Starting ModelDownloader (background thread)");
@@ -149,7 +167,6 @@ public class MainActivity extends Activity {
 
         float startModel = ((float)System.nanoTime() / 1_000_000_000f);
         print("(onCreate) Creating Model...");
-        // ModelDownloader stores under getFilesDir()/VOSK_MODEL_NAME
         File modelRoot = new File(getFilesDir(), ModelDownloader.VOSK_MODEL_NAME);
         if (!modelRoot.isDirectory()) {
           print("Model directory not found: " + modelRoot.getAbsolutePath());
@@ -282,6 +299,79 @@ public class MainActivity extends Activity {
       playButton.setText("Play Recorded Audio");
     } catch (Exception e) {
       runOnUiThread(() -> print("EXCEPTION: " + e.toString()));
+    }
+  }
+
+  private void startLiveTranscription() {
+    if (recognizer == null) {
+      print("Recognizer not initialized yet.");
+      return;
+    }
+    if (isRecording || isPlaying) {
+      print("Stop recording/playback first.");
+      return;
+    }
+    try {
+      int minBuf = AudioRecord.getMinBufferSize(sampleRate, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT);
+      int chunk  = Math.max(minBuf, 4096); // ~128 ms @ 16 kHz; good latency/accuracy tradeoff
+      liveRecorder = new AudioRecord(MediaRecorder.AudioSource.MIC, sampleRate, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT, chunk * 4);
+      liveRecorder.startRecording();
+      isLive = true;
+      liveButton.setText("Stop Live Transcription");
+      print("LIVE: started");
+
+      liveThread = new Thread(() -> {
+        byte[] buf = new byte[chunk];
+        float  lastPartialLog = (System.nanoTime() / 1_000_000_000f);
+        try {
+          while (isLive) {
+            int read = liveRecorder.read(buf, 0, buf.length);
+            if (read <= 0) continue;
+            boolean hasFinal = recognizer.acceptWaveForm(buf, read);
+            if (hasFinal) {
+              String json = recognizer.getResult();
+              print(json);
+            } else {
+              float now = (System.nanoTime() / 1_000_000_000f);
+              if ((now - lastPartialLog) >= 0.5f) { // rate-limit partial logs
+                String part = recognizer.getPartialResult();
+                print(part);
+                lastPartialLog = now;
+              }
+            }
+          }
+          // flush final result on stop
+          String fin = recognizer.getFinalResult();
+          if (fin != null && fin.length() > 0) print(fin);
+        } catch (Exception e) {
+          print("EXCEPTION (live): " + e.toString());
+        } finally {
+          try {
+            if (liveRecorder != null) {
+              liveRecorder.stop();
+              liveRecorder.release();
+            }
+          } catch (Exception ignore) {}
+          liveRecorder = null;
+          runOnUiThread(() -> liveButton.setText("Start Live Transcription"));
+          print("LIVE: stopped");
+        }
+      });
+      liveThread.start();
+    } catch (Exception e) {
+      print("EXCEPTION starting live: " + e.toString());
+      isLive = false;
+      try {
+        if (liveRecorder != null) { liveRecorder.release(); liveRecorder = null; }
+      } catch (Exception ignore) {}
+    }
+  }
+
+  private void stopLiveTranscription() {
+    isLive = false;
+    if (liveThread != null) {
+      try { liveThread.join(1000); } catch (InterruptedException ignored) {}
+      liveThread = null;
     }
   }
 
