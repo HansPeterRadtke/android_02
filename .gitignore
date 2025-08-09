@@ -6,3 +6,4 @@ build/
 *.iml
 .gradle/
 local.properties
+vosk-temp/
