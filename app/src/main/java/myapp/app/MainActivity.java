@@ -1,4 +1,5 @@
 package myapp.app;
+
 import myapp.app.utils.ModelDownloader;
 import org.vosk.Model;
 import org.vosk.Recognizer;
@@ -107,6 +108,10 @@ public class MainActivity extends Activity {
 
     toTextButton.setOnClickListener(v -> {
       try {
+        if (recognizer == null) {
+          print("Recognizer not initialized yet.");
+          return;
+        }
         float startTranscription = ((float)System.nanoTime() / 1_000_000_000f);
         synchronized (lock) {
           if (recordedBytes > 0) {
@@ -133,31 +138,35 @@ public class MainActivity extends Activity {
 
     print("(onCreate) Creating ModelDownloader");
     ModelDownloader md = new ModelDownloader(this);
-    print("(onCreate) Starting ModelDownloader");
-    md.run();
-    while (!md.done) {
+    print("(onCreate) Starting ModelDownloader (background thread)");
+    md.start(); // run in background, no network on UI thread
+
+    // Initialize model and recognizer off the UI thread after download completes
+    new Thread(() -> {
       try {
-        Thread.sleep(200);
-      } catch (InterruptedException e) {
-        print("InterruptedException while waiting for model download");
+        md.join();
+        print("(onCreate) md.done == " + md.done);
+
+        float startModel = ((float)System.nanoTime() / 1_000_000_000f);
+        print("(onCreate) Creating Model...");
+        // ModelDownloader stores under getFilesDir()/VOSK_MODEL_NAME
+        File modelRoot = new File(getFilesDir(), ModelDownloader.VOSK_MODEL_NAME);
+        if (!modelRoot.isDirectory()) {
+          print("Model directory not found: " + modelRoot.getAbsolutePath());
+          return;
+        }
+        model = new Model(modelRoot.getAbsolutePath());
+        float endModel = ((float)System.nanoTime() / 1_000_000_000f);
+        print("(onCreate) Model creation took: " + (endModel - startModel) + " seconds");
+
+        float startRecognizer = ((float)System.nanoTime() / 1_000_000_000f);
+        recognizer = new Recognizer(model, 16000.0f);
+        float endRecognizer = ((float)System.nanoTime() / 1_000_000_000f);
+        print("(onCreate) Recognizer creation took: " + (endRecognizer - startRecognizer) + " seconds");
+      } catch (Exception e) {
+        print("EXCEPTION during model/recognizer init: " + e.toString());
       }
-    }
-    print("(onCreate) md.done == " + md.done);
-
-    try {
-      float startModel      = ((float)System.nanoTime() / 1_000_000_000f);
-      print("(onCreate) Creating Model...");
-      this.model            = new Model(getCacheDir() + "/" + ModelDownloader.VOSK_MODEL_NAME);
-      float endModel        = ((float)System.nanoTime() / 1_000_000_000f);
-      print("(onCreate) Model creation took: " + (endModel - startModel) + " seconds");
-
-      float startRecognizer = ((float)System.nanoTime() / 1_000_000_000f);
-      this.recognizer       = new Recognizer(model, 16000.0f);
-      float endRecognizer   = ((float)System.nanoTime() / 1_000_000_000f);
-      print("(onCreate) Recognizer creation took: " + (endRecognizer - startRecognizer) + " seconds");
-    } catch (Exception e) {
-      print("EXCEPTION during model/recognizer init: " + e.toString());
-    }
+    }).start();
   }
 
   public void print(String msg) {
