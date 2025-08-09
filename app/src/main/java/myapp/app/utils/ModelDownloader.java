@@ -10,6 +10,7 @@ import java.util.zip.ZipInputStream;
 
 public class ModelDownloader extends Thread {
   private final MainActivity main;
+  public volatile boolean done = false;
 
   private static final String VOSK_MODEL_URL = "https://alphacephei.com/vosk/models/vosk-model-en-us-0.22-lgraph.zip";
 
@@ -34,7 +35,9 @@ public class ModelDownloader extends Thread {
       }
     } catch (Exception e) {
       main.print("EXCEPTION: " + e.toString());
-      pause(1000);
+      pause(1.0f);
+    } finally {
+      done = true;
     }
   }
 
@@ -94,9 +97,9 @@ public class ModelDownloader extends Thread {
     zis.close();
   }
 
-  public void pause(int ms) {
+  public void pause(float seconds) {
     try {
-      Thread.sleep(ms);
+      Thread.sleep((long)(seconds * 1000));
     } catch (InterruptedException e) {
       main.print("InterruptedException: " + e.toString());
     }

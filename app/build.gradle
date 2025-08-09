@@ -7,6 +7,7 @@ android {
   compileSdk   34
 
   defaultConfig {
+        ndk { abiFilters "arm64-v8a" }
     applicationId "myapp.app"
     minSdk        21
     targetSdk     34

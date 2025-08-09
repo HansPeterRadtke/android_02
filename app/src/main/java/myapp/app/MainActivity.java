@@ -24,7 +24,6 @@ import androidx.core.content.ContextCompat;
 
 import java.io.File;
 
-
 public class MainActivity extends Activity {
   private TextView      statusText  ;
   private Button        recordButton;
@@ -40,6 +39,7 @@ public class MainActivity extends Activity {
   private int           playbackPosition = 0;
   private final Object  lock             = new Object();
   private Recognizer    recognizer;
+  private Model         model;
 
   private static final int PERMISSION_REQUEST_CODE = 200;
 
@@ -79,17 +79,12 @@ public class MainActivity extends Activity {
 
     setContentView(layout);
 
-    print("(onCreate) called. ContentView initialized.");
-
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
       if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
-        print("(onCreate) Requesting permission");
         ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.RECORD_AUDIO}, PERMISSION_REQUEST_CODE);
       }
     }
-    print("(onCreate) permission checked");
 
-    print("(onCreate) creating recordbutton");
     recordButton.setOnClickListener(v -> {
       if (!isRecording) {
         startRecording();
@@ -98,7 +93,6 @@ public class MainActivity extends Activity {
       }
     });
 
-    print("(onCreate) creating playbutton");
     playButton.setOnClickListener(v -> {
       if (!isPlaying) {
         startPlayback();
@@ -107,28 +101,24 @@ public class MainActivity extends Activity {
       }
     });
 
-    print("(onCreate) creating readtextbutton");
     readTextButton.setOnClickListener(v -> {
       print("Read Text pressed");
     });
 
-    print("(onCreate) creating totextbutton");
     toTextButton.setOnClickListener(v -> {
       try {
-        String path = (getCacheDir() + "/vosk-model-en-us-0.22-lgraph");
-        print("(onCreate) creating Model from " + path);
-        File file = new File(path);
-        if(file.exists()) {
-          print("And yes, it exists!!");
-        }
-        else {
-          print("oh, well, it does NOT exist ...");
-        }
-        Model model     = new Model(path);
-        print("(onCreate) creating Recognizer");
-        this.recognizer = new Recognizer(model, 16000.0f);
-        print("(onCreate) creating Model");
-        print("Running the recognizer now:");
+        float startModel = System.currentTimeMillis() / 1000f;
+        print("(toTextButton) Creating Model...");
+        model     = new Model(getCacheDir() + "/vosk-model-en-us-0.22-lgraph");
+        float endModel = System.currentTimeMillis() / 1000f;
+        print("(toTextButton) Model creation took: " + (endModel - startModel) + " seconds");
+
+        float startRecognizer = System.currentTimeMillis() / 1000f;
+        recognizer = new Recognizer(model, 16000.0f);
+        float endRecognizer = System.currentTimeMillis() / 1000f;
+        print("(toTextButton) Recognizer creation took: " + (endRecognizer - startRecognizer) + " seconds");
+
+        float startTranscription = System.currentTimeMillis() / 1000f;
         synchronized (lock) {
           if (recordedBytes > 0) {
             recognizer.acceptWaveForm(recordedData, recordedBytes);
@@ -137,22 +127,45 @@ public class MainActivity extends Activity {
             print("No recorded audio to process.");
           }
         }
-        print("BUTTON: To Text pressed. Buffer reset requested.");
+        float endTranscription = System.currentTimeMillis() / 1000f;
+        print("(toTextButton) Transcription took: " + (endTranscription - startTranscription) + " seconds");
+
+        float audioSeconds = (float) recordedBytes / (sampleRate * 2);
+        if (audioSeconds > 0) {
+          float factor = (endTranscription - startTranscription) / audioSeconds;
+          print("(toTextButton) Processing speed factor: " + factor + "x real-time");
+        }
+
         resetBuffer();
       } catch (Exception e) {
         print("EXCEPTION: " + e.toString());
       }
     });
 
-    try {
-      print("(onCreate) creating ModelDownloader");
-      ModelDownloader md    = new ModelDownloader(this);
-      print("(onCreate) starting ModelDownloader");
-      md.start();
-    } catch (Exception e) {
-      print("EXCEPTION: " + e.toString());
+    ModelDownloader md = new ModelDownloader(this);
+    md.start();
+    while (!md.done) {
+      try {
+        Thread.sleep(200);
+      } catch (InterruptedException e) {
+        print("InterruptedException while waiting for model download");
+      }
     }
-    print("(onCreate) all done");
+
+    try {
+      float startModel = System.currentTimeMillis() / 1000f;
+      print("(onCreate) Creating Model...");
+      model     = new Model(getCacheDir() + "/vosk-model-en-us-0.22-lgraph");
+      float endModel = System.currentTimeMillis() / 1000f;
+      print("(onCreate) Model creation took: " + (endModel - startModel) + " seconds");
+
+      float startRecognizer = System.currentTimeMillis() / 1000f;
+      recognizer = new Recognizer(model, 16000.0f);
+      float endRecognizer = System.currentTimeMillis() / 1000f;
+      print("(onCreate) Recognizer creation took: " + (endRecognizer - startRecognizer) + " seconds");
+    } catch (Exception e) {
+      print("EXCEPTION during model/recognizer init: " + e.toString());
+    }
   }
 
   public void print(String msg) {
@@ -161,7 +174,6 @@ public class MainActivity extends Activity {
 
   private void startRecording() {
     try {
-      print("RECORD: Start recording initiated.");
       recorder = new AudioRecord(MediaRecorder.AudioSource.MIC, sampleRate,
           AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT,
           AudioRecord.getMinBufferSize(sampleRate, AudioFormat.CHANNEL_IN_MONO,
@@ -176,6 +188,7 @@ public class MainActivity extends Activity {
           offset = recordedBytes;
         }
         int chunkSize = 8192;
+        long lastPrintTime = System.currentTimeMillis();
         while (isRecording && offset < recordedData.length) {
           int read = recorder.read(recordedData, offset, Math.min(chunkSize, recordedData.length - offset));
           if (read > 0) {
@@ -184,8 +197,11 @@ public class MainActivity extends Activity {
               recordedBytes = offset;
             }
             float seconds = (float) offset / (sampleRate * 2);
-            String status = String.format("RECORD: Bytes: %d | Duration: %.2f sec", offset, seconds);
-            print(status);
+            if (System.currentTimeMillis() - lastPrintTime >= 2000) {
+              String status = String.format("RECORD: Bytes: %d | Duration: %.2f sec", offset, seconds);
+              print(status);
+              lastPrintTime = System.currentTimeMillis();
+            }
           }
         }
         runOnUiThread(() -> recordButton.setText("Start Recording"));
@@ -197,7 +213,6 @@ public class MainActivity extends Activity {
 
   private void stopRecording() {
     try {
-      print("RECORD: Stop recording requested.");
       isRecording = false;
       if (recorder != null) {
         recorder.stop   ();
@@ -211,7 +226,6 @@ public class MainActivity extends Activity {
 
   private void startPlayback() {
     try {
-      print("PLAY: Start playback requested.");
       synchronized (lock) {
         if (playbackPosition >= recordedBytes) playbackPosition = 0;
       }
@@ -227,6 +241,7 @@ public class MainActivity extends Activity {
         synchronized (lock) {
           localPosition = playbackPosition;
         }
+        long lastPrintTime = System.currentTimeMillis();
         while (isPlaying) {
           int toWrite;
           int recorded;
@@ -240,9 +255,12 @@ public class MainActivity extends Activity {
           synchronized (lock) {
             playbackPosition = localPosition;
           }
-          float seconds = (float) recorded / (sampleRate * 2);
-          String status = String.format("PLAY: Bytes: %d | Duration: %.2f sec | Pos: %d", recorded, seconds, localPosition);
-          runOnUiThread(() -> print(status));
+          if (System.currentTimeMillis() - lastPrintTime >= 2000) {
+            float seconds = (float) recorded / (sampleRate * 2);
+            String status = String.format("PLAY: Bytes: %d | Duration: %.2f sec | Pos: %d", recorded, seconds, localPosition);
+            print(status);
+            lastPrintTime = System.currentTimeMillis();
+          }
         }
         runOnUiThread(this::stopPlayback);
       }).start();
@@ -253,7 +271,6 @@ public class MainActivity extends Activity {
 
   private void stopPlayback() {
     try {
-      print("PLAY: Stop playback requested.");
       isPlaying = false;
       if (player != null) {
         player.stop();
