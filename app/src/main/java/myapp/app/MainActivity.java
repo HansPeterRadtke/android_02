@@ -23,18 +23,23 @@ import android.content.pm.PackageManager;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 
+import org.json.JSONObject;
+
 import java.io.File;
 
 public class MainActivity extends Activity {
-  private TextView      statusText  ;
+  private TextView      statusText;
+  private TextView      liveText;
+  private ScrollView    liveScroll;
   private Button        recordButton;
-  private Button        playButton  ;
+  private Button        playButton;
   private Button        readTextButton;
-  private Button        liveButton  ;
-  private AudioRecord   recorder    ;
-  private AudioTrack    player      ;
+  private Button        liveButton;
+  private Button        toTextButton;
+  private AudioRecord   recorder;
+  private AudioTrack    player;
   private AudioRecord   liveRecorder;
-  private Thread        liveThread  ;
+  private Thread        liveThread;
   private boolean       isRecording  = false;
   private boolean       isPlaying    = false;
   private boolean       isLive       = false;
@@ -67,7 +72,7 @@ public class MainActivity extends Activity {
     readTextButton.setText("Read Text");
     layout.addView(readTextButton);
 
-    Button toTextButton = new Button(this);
+    toTextButton = new Button(this);
     toTextButton.setText("To Text");
     layout.addView(toTextButton);
 
@@ -75,16 +80,31 @@ public class MainActivity extends Activity {
     liveButton.setText("Start Live Transcription");
     layout.addView(liveButton);
 
+    // Live field directly under the buttons, same behavior as status, min 1 line, max 10 lines
+    liveText = new TextView(this);
+    liveText.setLayoutParams(new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+    liveText.setTextIsSelectable(true);
+    liveText.setSingleLine(false);
+    liveText.setMinLines(1);
+    liveText.setMaxLines(10);
+    liveText.setText("");
+    liveScroll = new ScrollView(this);
+    liveScroll.setFillViewport(true);
+    liveScroll.setLayoutParams(new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+    liveScroll.addView(liveText);
+    layout.addView(liveScroll);
+
+    // Existing debug/status field below (takes remaining height)
     statusText = new TextView(this);
-    statusText.setLayoutParams    (new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+    statusText.setLayoutParams(new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
     statusText.setTextIsSelectable(true);
-    statusText.setSingleLine      (false);
-    statusText.setMaxLines        (Integer.MAX_VALUE);
-    ScrollView scrollView = new ScrollView(this);
-    scrollView.setFillViewport(true);
-    scrollView.setLayoutParams(new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f));
-    scrollView.addView        (statusText);
-    layout.addView(scrollView);
+    statusText.setSingleLine(false);
+    statusText.setMaxLines(Integer.MAX_VALUE);
+    ScrollView statusScroll = new ScrollView(this);
+    statusScroll.setFillViewport(true);
+    statusScroll.setLayoutParams(new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f));
+    statusScroll.addView(statusText);
+    layout.addView(statusScroll);
 
     setContentView(layout);
 
@@ -95,95 +115,64 @@ public class MainActivity extends Activity {
     }
 
     recordButton.setOnClickListener(v -> {
-      if (isLive) { print("Live transcription running. Stop it first."); return; }
-      if (!isRecording) {
-        startRecording();
-      } else {
-        stopRecording();
-      }
+      if (isLive) { print("LIVE: Already running; stop it first."); return; }
+      if (!isRecording) startRecording(); else stopRecording();
     });
 
     playButton.setOnClickListener(v -> {
-      if (isLive) { print("Live transcription running. Stop it first."); return; }
-      if (!isPlaying) {
-        startPlayback();
-      } else {
-        stopPlayback();
-      }
+      if (isLive) { print("LIVE: Already running; stop it first."); return; }
+      if (!isPlaying) startPlayback(); else stopPlayback();
     });
 
-    readTextButton.setOnClickListener(v -> {
-      print("Read Text pressed");
-    });
+    readTextButton.setOnClickListener(v -> { print("Read Text pressed"); });
 
     toTextButton.setOnClickListener(v -> {
       try {
-        if (recognizer == null) {
-          print("Recognizer not initialized yet.");
-          return;
-        }
-        float startTranscription = ((float)System.nanoTime() / 1_000_000_000f);
+        if (recognizer == null) { print("ERROR: recognizer == null"); return; }
+        float startTranscription = nowSec();
         synchronized (lock) {
           if (recordedBytes > 0) {
-            recognizer.acceptWaveForm(recordedData, recordedBytes);
+            boolean done = recognizer.acceptWaveForm(recordedData, recordedBytes);
+            print("toText: acceptWaveForm=" + done);
             print(recognizer.getFinalResult());
           } else {
-            print("No recorded audio to process.");
+            print("toText: no recorded audio");
           }
         }
-        float endTranscription      = ((float)System.nanoTime() / 1_000_000_000f);
-        float durationTranscription = (endTranscription - startTranscription);
-        print("(toTextButton) Transcription took: " + durationTranscription + " seconds");
-        float audioSeconds          = ((float) recordedBytes / (sampleRate * 2));
-        print("(toTextButton) audioSeconds = " + audioSeconds + " seconds");
-        if (audioSeconds > 0) {
-          float factor = ((float)durationTranscription / audioSeconds);
-          print("(toTextButton) Processing speed factor: " + factor + "x real-time");
-        }
+        float dur = nowSec() - startTranscription;
+        float audioSec = ((float) recordedBytes / (sampleRate * 2));
+        print(String.format("(toText) dur=%.3fs audio=%.3fs xRT=%.3f", dur, audioSec, audioSec > 0 ? dur / audioSec : -1f));
         resetBuffer();
       } catch (Exception e) {
-        print("EXCEPTION: " + e.toString());
+        print("EXCEPTION(toText): " + e);
       }
     });
 
-    liveButton.setOnClickListener(v -> {
-      if (!isLive) {
-        startLiveTranscription();
-      } else {
-        stopLiveTranscription();
-      }
-    });
+    liveButton.setOnClickListener(v -> { if (!isLive) startLiveTranscription(); else stopLiveTranscription(); });
 
+    // Synchronous download + init at end of onCreate (same timing as before)
     print("(onCreate) Creating ModelDownloader");
     ModelDownloader md = new ModelDownloader(this);
-    print("(onCreate) Starting ModelDownloader (background thread)");
-    md.start(); // run in background, no network on UI thread
+    print("(onCreate) Starting ModelDownloader");
+    md.run();
+    while (!md.done) {
+      try { Thread.sleep(200); } catch (InterruptedException e) { print("Interrupted while waiting for model download"); }
+    }
+    print("(onCreate) md.done == " + md.done);
 
-    // Initialize model and recognizer off the UI thread after download completes
-    new Thread(() -> {
-      try {
-        md.join();
-        print("(onCreate) md.done == " + md.done);
+    try {
+      float t0 = nowSec();
+      print("(onCreate) Creating Model at " + getFilesDir() + "/" + ModelDownloader.VOSK_MODEL_NAME);
+      File modelRoot = new File(getFilesDir(), ModelDownloader.VOSK_MODEL_NAME);
+      model = new Model(modelRoot.getAbsolutePath());
+      print(String.format("(onCreate) Model created in %.3fs", nowSec() - t0));
 
-        float startModel = ((float)System.nanoTime() / 1_000_000_000f);
-        print("(onCreate) Creating Model...");
-        File modelRoot = new File(getFilesDir(), ModelDownloader.VOSK_MODEL_NAME);
-        if (!modelRoot.isDirectory()) {
-          print("Model directory not found: " + modelRoot.getAbsolutePath());
-          return;
-        }
-        model = new Model(modelRoot.getAbsolutePath());
-        float endModel = ((float)System.nanoTime() / 1_000_000_000f);
-        print("(onCreate) Model creation took: " + (endModel - startModel) + " seconds");
-
-        float startRecognizer = ((float)System.nanoTime() / 1_000_000_000f);
-        recognizer = new Recognizer(model, 16000.0f);
-        float endRecognizer = ((float)System.nanoTime() / 1_000_000_000f);
-        print("(onCreate) Recognizer creation took: " + (endRecognizer - startRecognizer) + " seconds");
-      } catch (Exception e) {
-        print("EXCEPTION during model/recognizer init: " + e.toString());
-      }
-    }).start();
+      t0 = nowSec();
+      recognizer = new Recognizer(model, 16000.0f);
+      print(String.format("(onCreate) Recognizer created in %.3fs", nowSec() - t0));
+    } catch (Exception e) {
+      print("EXCEPTION(init): " + e);
+    }
   }
 
   public void print(String msg) {
@@ -192,39 +181,52 @@ public class MainActivity extends Activity {
     }
   }
 
+  private void setLiveText(String text) {
+    runOnUiThread(() -> {
+      liveText.setText(text);
+      liveScroll.post(() -> liveScroll.fullScroll(View.FOCUS_DOWN));
+    });
+  }
+
   private void startRecording() {
     try {
-      recorder = new AudioRecord(MediaRecorder.AudioSource.MIC, sampleRate, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT, AudioRecord.getMinBufferSize(sampleRate, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT));
+      int min = AudioRecord.getMinBufferSize(sampleRate, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT);
+      print("RECORD: minBuffer=" + min);
+      recorder = new AudioRecord(
+        MediaRecorder.AudioSource.MIC,
+        sampleRate,
+        AudioFormat.CHANNEL_IN_MONO,
+        AudioFormat.ENCODING_PCM_16BIT,
+        Math.max(min, 8192)
+      );
+      print("RECORD: state=" + recorder.getState());
       recorder.startRecording();
       isRecording = true;
       recordButton.setText("Stop Recording");
 
       new Thread(() -> {
         int offset;
-        synchronized (lock) {
-          offset = recordedBytes;
-        }
+        synchronized (lock) { offset = recordedBytes; }
         int   chunkSize     = 8192;
-        float lastPrintTime = (System.nanoTime() / 1_000_000_000f);
+        float lastPrintTime = nowSec();
         while(isRecording && (offset < recordedData.length)) {
           int read = recorder.read(recordedData, offset, Math.min(chunkSize, (recordedData.length - offset)));
-          if(read > 0) {
+          if (read > 0) {
             offset += read;
-            synchronized (lock) {
-              recordedBytes = offset;
-            }
+            synchronized (lock) { recordedBytes = offset; }
             float seconds = ((float) offset / (sampleRate * 2));
-            if(((System.nanoTime() / 1_000_000_000f) - lastPrintTime) >= 2.0) {
-              String status = String.format("RECORD: Bytes: %d | Duration: %.2f sec", offset, seconds);
-              print(status);
-              lastPrintTime = (System.nanoTime() / 1_000_000_000f);
+            if (nowSec() - lastPrintTime >= 2.0f) {
+              print(String.format("RECORD: read=%d offset=%d dur=%.2fs rms=%.1f dBFS", read, offset, seconds, rmsDb(recordedData, offset - read, read)));
+              lastPrintTime = nowSec();
             }
+          } else {
+            print("RECORD: read=" + read);
           }
         }
         runOnUiThread(() -> recordButton.setText("Start Recording"));
       }).start();
     } catch (Exception e) {
-      print("EXCEPTION: " + e.toString());
+      print("EXCEPTION(RECORD): " + e);
     }
   }
 
@@ -232,24 +234,23 @@ public class MainActivity extends Activity {
     try {
       isRecording = false;
       if (recorder != null) {
-        recorder.stop   ();
+        recorder.stop();
         recorder.release();
         recorder = null;
         float duration_sec = ((float) recordedBytes / (sampleRate * 2));
         print("(stopRecording) duration_sec = " + duration_sec);
       }
     } catch (Exception e) {
-      print("EXCEPTION: " + e.toString());
+      print("EXCEPTION(stopRecording): " + e);
     }
   }
 
   private void startPlayback() {
     try {
-      synchronized (lock) {
-        if (playbackPosition >= recordedBytes) playbackPosition = 0;
-      }
+      synchronized (lock) { if (playbackPosition >= recordedBytes) playbackPosition = 0; }
       int bufferSize = AudioTrack.getMinBufferSize(sampleRate, AudioFormat.CHANNEL_OUT_MONO, AudioFormat.ENCODING_PCM_16BIT);
       player         = new AudioTrack(AudioManager.STREAM_MUSIC, sampleRate, AudioFormat.CHANNEL_OUT_MONO, AudioFormat.ENCODING_PCM_16BIT, bufferSize, AudioTrack.MODE_STREAM);
+      print("PLAY: bufferSize=" + bufferSize);
       player.play();
       isPlaying = true;
       playButton.setText("Stop Playback");
@@ -257,12 +258,10 @@ public class MainActivity extends Activity {
       new Thread(() -> {
         int chunkSize = 1024;
         int localPosition;
-        synchronized (lock) {
-          localPosition = playbackPosition;
-        }
-        float lastPrintTime = (System.nanoTime() / 1_000_000_000f);
+        synchronized (lock) { localPosition = playbackPosition; }
+        float lastPrintTime = nowSec();
         while(isPlaying) {
-          int toWrite ;
+          int toWrite;
           int recorded;
           synchronized (lock) {
             toWrite  = Math.min(chunkSize, (recordedBytes - localPosition));
@@ -271,20 +270,17 @@ public class MainActivity extends Activity {
           if(toWrite <= 0) break;
           player.write(recordedData, localPosition, toWrite);
           localPosition += toWrite;
-          synchronized (lock) {
-            playbackPosition = localPosition;
-          }
-          if(((System.nanoTime() / 1_000_000_000f) - lastPrintTime) >= 2.0) {
+          synchronized (lock) { playbackPosition = localPosition; }
+          if(nowSec() - lastPrintTime >= 2.0f) {
             float  seconds = (float) recorded / (sampleRate * 2);
-            String status  = String.format("PLAY: Bytes: %d | Duration: %.2f sec | Pos: %d", recorded, seconds, localPosition);
-            print(status);
-            lastPrintTime  = (System.nanoTime() / 1_000_000_000f);
+            print(String.format("PLAY: wrote=%d pos=%d dur=%.2fs", toWrite, localPosition, seconds));
+            lastPrintTime  = nowSec();
           }
         }
         runOnUiThread(this::stopPlayback);
       }).start();
     } catch (Exception e) {
-      print("EXCEPTION: " + e.toString());
+      print("EXCEPTION(PLAY): " + e);
     }
   }
 
@@ -292,59 +288,90 @@ public class MainActivity extends Activity {
     try {
       isPlaying = false;
       if (player != null) {
-        player.stop   ();
+        player.stop();
         player.release();
         player = null;
       }
       playButton.setText("Play Recorded Audio");
     } catch (Exception e) {
-      runOnUiThread(() -> print("EXCEPTION: " + e.toString()));
+      runOnUiThread(() -> print("EXCEPTION(stopPlayback): " + e));
     }
   }
 
   private void startLiveTranscription() {
-    if (recognizer == null) {
-      print("Recognizer not initialized yet.");
-      return;
-    }
-    if (isRecording || isPlaying) {
-      print("Stop recording/playback first.");
-      return;
-    }
+    if (recognizer == null) { print("ERROR: recognizer == null"); return; }
+    if (isRecording || isPlaying) { print("ERROR: stop recording/playback first"); return; }
+
     try {
       int minBuf = AudioRecord.getMinBufferSize(sampleRate, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT);
-      int chunk  = Math.max(minBuf, 4096); // ~128 ms @ 16 kHz; good latency/accuracy tradeoff
-      liveRecorder = new AudioRecord(MediaRecorder.AudioSource.MIC, sampleRate, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT, chunk * 4);
+      int chunk  = Math.max(minBuf, 4096); // ~128 ms @ 16 kHz
+      print("LIVE: minBuf=" + minBuf + " chunk=" + chunk);
+      liveRecorder = new AudioRecord(
+        MediaRecorder.AudioSource.MIC,
+        sampleRate,
+        AudioFormat.CHANNEL_IN_MONO,
+        AudioFormat.ENCODING_PCM_16BIT,
+        chunk * 4
+      );
+      print("LIVE: recorder state=" + liveRecorder.getState());
       liveRecorder.startRecording();
       isLive = true;
       liveButton.setText("Stop Live Transcription");
-      print("LIVE: started");
+      setLiveText("");
+
+      final StringBuilder liveBuffer = new StringBuilder();
 
       liveThread = new Thread(() -> {
         byte[] buf = new byte[chunk];
-        float  lastPartialLog = (System.nanoTime() / 1_000_000_000f);
+        float  lastPartialLog = nowSec();
+        long   totalRead = 0;
         try {
+          print("LIVE: started loop");
           while (isLive) {
             int read = liveRecorder.read(buf, 0, buf.length);
-            if (read <= 0) continue;
+            if (read <= 0) {
+              print("LIVE: read=" + read);
+              continue;
+            }
+            totalRead += read;
+
             boolean hasFinal = recognizer.acceptWaveForm(buf, read);
             if (hasFinal) {
-              String json = recognizer.getResult();
-              print(json);
+              String j  = recognizer.getResult();
+              String fin = extractTextJson(j, false);
+              print("LIVE: acceptWaveForm=true bytes=" + read + " rms=" + String.format("%.1f", rmsDb(buf, 0, read)) + " finalJson=" + trimForLog(j));
+              if (!fin.isEmpty()) {
+                if (liveBuffer.length() > 0) liveBuffer.append(' ');
+                liveBuffer.append(fin);
+                setLiveText(liveBuffer.toString());
+              } else {
+                print("LIVE: final text empty");
+              }
             } else {
-              float now = (System.nanoTime() / 1_000_000_000f);
-              if ((now - lastPartialLog) >= 0.5f) { // rate-limit partial logs
-                String part = recognizer.getPartialResult();
-                print(part);
+              float now = nowSec();
+              if ((now - lastPartialLog) >= 0.25f) {
+                String pjson = recognizer.getPartialResult();
+                String part  = extractTextJson(pjson, true);
+                print("LIVE: acceptWaveForm=false bytes=" + read + " rms=" + String.format("%.1f", rmsDb(buf, 0, read)) + " partialJson=" + trimForLog(pjson) + " part='" + part + "'");
+                String shown = part.isEmpty()
+                               ? liveBuffer.toString()
+                               : (liveBuffer.length() > 0 ? (liveBuffer.toString() + " " + part) : part);
+                if (!shown.isEmpty()) setLiveText(shown);
                 lastPartialLog = now;
               }
             }
           }
-          // flush final result on stop
-          String fin = recognizer.getFinalResult();
-          if (fin != null && fin.length() > 0) print(fin);
+
+          String finJson = recognizer.getFinalResult();
+          String fin     = extractTextJson(finJson, false);
+          print("LIVE: finalFlush json=" + trimForLog(finJson) + " text='" + fin + "'");
+          if (!fin.isEmpty()) {
+            if (liveBuffer.length() > 0) liveBuffer.append(' ');
+            liveBuffer.append(fin);
+            setLiveText(liveBuffer.toString());
+          }
         } catch (Exception e) {
-          print("EXCEPTION (live): " + e.toString());
+          print("EXCEPTION(LIVE loop): " + e);
         } finally {
           try {
             if (liveRecorder != null) {
@@ -354,16 +381,16 @@ public class MainActivity extends Activity {
           } catch (Exception ignore) {}
           liveRecorder = null;
           runOnUiThread(() -> liveButton.setText("Start Live Transcription"));
-          print("LIVE: stopped");
+          print("LIVE: stopped totalRead=" + totalRead);
         }
       });
+
       liveThread.start();
+      print("LIVE: started");
     } catch (Exception e) {
-      print("EXCEPTION starting live: " + e.toString());
+      print("EXCEPTION(startLive): " + e);
       isLive = false;
-      try {
-        if (liveRecorder != null) { liveRecorder.release(); liveRecorder = null; }
-      } catch (Exception ignore) {}
+      try { if (liveRecorder != null) { liveRecorder.release(); liveRecorder = null; } } catch (Exception ignore) {}
     }
   }
 
@@ -373,6 +400,55 @@ public class MainActivity extends Activity {
       try { liveThread.join(1000); } catch (InterruptedException ignored) {}
       liveThread = null;
     }
+  }
+
+  // Robust JSON extraction using org.json; falls back to empty string on error.
+  private String extractTextJson(String json, boolean partial) {
+    try {
+      if (json == null || json.isEmpty()) return "";
+      JSONObject o = new JSONObject(json);
+      String key = partial ? "partial" : "text";
+      if (!o.has(key)) return "";
+      String s = o.optString(key, "");
+      if (s == null) return "";
+      s = s.replace("\n", " ").replace("\t", " ").trim();
+      return s;
+    } catch (Exception e) {
+      print("JSON parse fail: " + trimForLog(json) + " err=" + e.getMessage());
+      return "";
+    }
+  }
+
+  private String trimForLog(String s) {
+    if (s == null) return "null";
+    if (s.length() > 160) return s.substring(0, 160) + "...";
+    return s;
+    }
+
+  private float nowSec() {
+    return (float) (System.nanoTime() / 1_000_000_000.0);
+  }
+
+  // Compute RMS in dBFS for byte PCM16 (little-endian). Overload for recordedData[] (byte[]) and buf (byte[]).
+  private float rmsDb(byte[] data, int offset, int len) {
+    if (len <= 1) return -120f;
+    long sum = 0;
+    int samples = 0;
+    int end = offset + len;
+    for (int i = offset; i + 1 < end; i += 2) {
+      int lo = data[i] & 0xFF;
+      int hi = data[i + 1];
+      short s = (short)((hi << 8) | lo);
+      int v = s;
+      sum += (long)v * (long)v;
+      samples++;
+    }
+    if (samples == 0) return -120f;
+    double mean = sum / (double) samples;
+    double rms = Math.sqrt(mean);
+    // 16-bit full-scale is 32768
+    double db = 20.0 * Math.log10(rms / 32768.0 + 1e-12);
+    return (float) db;
   }
 
   private void resetBuffer() {
