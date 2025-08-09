@@ -25,7 +25,6 @@ import androidx.core.content.ContextCompat;
 import java.io.File;
 
 public class MainActivity extends Activity {
-  public  String        model_name  = "vosk-model-en-us-0.22-lgraph";
   private TextView      statusText  ;
   private Button        recordButton;
   private Button        playButton  ;
@@ -148,7 +147,7 @@ public class MainActivity extends Activity {
     try {
       float startModel      = ((float)System.nanoTime() / 1_000_000_000f);
       print("(onCreate) Creating Model...");
-      this.model            = new Model(getCacheDir() + "/vosk-model-en-us-0.22-lgraph");
+      this.model            = new Model(getCacheDir() + "/" + ModelDownloader.VOSK_MODEL_NAME);
       float endModel        = ((float)System.nanoTime() / 1_000_000_000f);
       print("(onCreate) Model creation took: " + (endModel - startModel) + " seconds");
 

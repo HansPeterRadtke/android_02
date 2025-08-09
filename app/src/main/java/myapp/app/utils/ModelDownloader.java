@@ -9,9 +9,10 @@ import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 
 public class ModelDownloader extends Thread {
-  private final          MainActivity main;
   public  volatile       boolean      done = false;
-  private static   final String       VOSK_MODEL_URL = "https://alphacephei.com/vosk/models/vosk-model-en-us-0.22-lgraph.zip";
+  public  static   final String       VOSK_MODEL_NAME = "vosk-model-en-us-0.22-lgraph";
+  private static   final String       VOSK_MODEL_URL  = "https://alphacephei.com/vosk/models/" + VOSK_MODEL_NAME + ".zip";
+  private final          MainActivity main;
 
   public ModelDownloader(MainActivity main) {
     this.main = main;
@@ -21,7 +22,7 @@ public class ModelDownloader extends Thread {
   public void run() {
     main.print("DOWNLOADER: Checking model files...");
     try {
-      File modelDir = new File(main.getCacheDir(), "vosk-model-en-us-0.22-lgraph");
+      File modelDir = new File(main.getCacheDir(), VOSK_MODEL_NAME);
       if (!modelDir.exists()) {
         modelDir.mkdirs();
         File zipFile = new File(main.getCacheDir(), "vosk-model.zip");
