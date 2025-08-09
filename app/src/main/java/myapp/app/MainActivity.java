@@ -29,6 +29,7 @@ public class MainActivity extends Activity {
   private TextView      statusText  ;
   private Button        recordButton;
   private Button        playButton  ;
+  private Button        readTextButton;
   private AudioRecord   recorder    ;
   private AudioTrack    player      ;
   private boolean       isRecording  = false;
@@ -54,8 +55,12 @@ public class MainActivity extends Activity {
     layout.addView(recordButton);
 
     playButton = new Button(this);
-    playButton.setText("Read Text");
+    playButton.setText("Play Recorded Audio");
     layout.addView(playButton);
+
+    readTextButton = new Button(this);
+    readTextButton.setText("Read Text");
+    layout.addView(readTextButton);
 
     Button toTextButton = new Button(this);
     toTextButton.setText("To Text");
@@ -100,6 +105,11 @@ public class MainActivity extends Activity {
       } else {
         stopPlayback();
       }
+    });
+
+    print("(onCreate) creating readtextbutton");
+    readTextButton.setOnClickListener(v -> {
+      print("Read Text pressed");
     });
 
     print("(onCreate) creating totextbutton");
@@ -250,7 +260,7 @@ public class MainActivity extends Activity {
         player.release();
         player = null;
       }
-      playButton.setText("Read Text");
+      playButton.setText("Play Recorded Audio");
     } catch (Exception e) {
       runOnUiThread(() -> print("EXCEPTION: " + e.toString()));
     }
