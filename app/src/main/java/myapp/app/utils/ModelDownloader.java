@@ -10,7 +10,8 @@ import java.util.zip.ZipInputStream;
 
 public class ModelDownloader extends Thread {
   public  volatile       boolean      done = false;
-  public  static   final String       VOSK_MODEL_NAME = "vosk-model-en-us-0.22-lgraph";
+//  public  static   final String       VOSK_MODEL_NAME = "vosk-model-en-us-0.22-lgraph";
+  public  static   final String       VOSK_MODEL_NAME = "vosk-model-small-en-us-0.15";
   private static   final String       VOSK_MODEL_URL  = "https://alphacephei.com/vosk/models/" + VOSK_MODEL_NAME + ".zip";
   private final          MainActivity main;
 
