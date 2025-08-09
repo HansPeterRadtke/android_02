@@ -25,6 +25,7 @@ import androidx.core.content.ContextCompat;
 import java.io.File;
 
 public class MainActivity extends Activity {
+  public  String        model_name  = "vosk-model-en-us-0.22-lgraph";
   private TextView      statusText  ;
   private Button        recordButton;
   private Button        playButton  ;
@@ -107,18 +108,7 @@ public class MainActivity extends Activity {
 
     toTextButton.setOnClickListener(v -> {
       try {
-        float startModel = System.currentTimeMillis() / 1000f;
-        print("(toTextButton) Creating Model...");
-        model     = new Model(getCacheDir() + "/vosk-model-en-us-0.22-lgraph");
-        float endModel = System.currentTimeMillis() / 1000f;
-        print("(toTextButton) Model creation took: " + (endModel - startModel) + " seconds");
-
-        float startRecognizer = System.currentTimeMillis() / 1000f;
-        recognizer = new Recognizer(model, 16000.0f);
-        float endRecognizer = System.currentTimeMillis() / 1000f;
-        print("(toTextButton) Recognizer creation took: " + (endRecognizer - startRecognizer) + " seconds");
-
-        float startTranscription = System.currentTimeMillis() / 1000f;
+        float startTranscription = ((float)System.nanoTime() / 1_000_000_000f);
         synchronized (lock) {
           if (recordedBytes > 0) {
             recognizer.acceptWaveForm(recordedData, recordedBytes);
@@ -127,23 +117,25 @@ public class MainActivity extends Activity {
             print("No recorded audio to process.");
           }
         }
-        float endTranscription = System.currentTimeMillis() / 1000f;
-        print("(toTextButton) Transcription took: " + (endTranscription - startTranscription) + " seconds");
-
-        float audioSeconds = (float) recordedBytes / (sampleRate * 2);
+        float endTranscription      = ((float)System.nanoTime() / 1_000_000_000f);
+        float durationTranscription = (endTranscription - startTranscription);
+        print("(toTextButton) Transcription took: " + durationTranscription + " seconds");
+        float audioSeconds          = ((float) recordedBytes / (sampleRate * 2));
+        print("(toTextButton) audioSeconds = " + audioSeconds + " seconds");
         if (audioSeconds > 0) {
-          float factor = (endTranscription - startTranscription) / audioSeconds;
+          float factor = ((float)durationTranscription / audioSeconds);
           print("(toTextButton) Processing speed factor: " + factor + "x real-time");
         }
-
         resetBuffer();
       } catch (Exception e) {
         print("EXCEPTION: " + e.toString());
       }
     });
 
+    print("(onCreate) Creating ModelDownloader");
     ModelDownloader md = new ModelDownloader(this);
-    md.start();
+    print("(onCreate) Starting ModelDownloader");
+    md.run();
     while (!md.done) {
       try {
         Thread.sleep(200);
@@ -151,17 +143,18 @@ public class MainActivity extends Activity {
         print("InterruptedException while waiting for model download");
       }
     }
+    print("(onCreate) md.done == " + md.done);
 
     try {
-      float startModel = System.currentTimeMillis() / 1000f;
+      float startModel      = ((float)System.nanoTime() / 1_000_000_000f);
       print("(onCreate) Creating Model...");
-      model     = new Model(getCacheDir() + "/vosk-model-en-us-0.22-lgraph");
-      float endModel = System.currentTimeMillis() / 1000f;
+      this.model            = new Model(getCacheDir() + "/vosk-model-en-us-0.22-lgraph");
+      float endModel        = ((float)System.nanoTime() / 1_000_000_000f);
       print("(onCreate) Model creation took: " + (endModel - startModel) + " seconds");
 
-      float startRecognizer = System.currentTimeMillis() / 1000f;
-      recognizer = new Recognizer(model, 16000.0f);
-      float endRecognizer = System.currentTimeMillis() / 1000f;
+      float startRecognizer = ((float)System.nanoTime() / 1_000_000_000f);
+      this.recognizer       = new Recognizer(model, 16000.0f);
+      float endRecognizer   = ((float)System.nanoTime() / 1_000_000_000f);
       print("(onCreate) Recognizer creation took: " + (endRecognizer - startRecognizer) + " seconds");
     } catch (Exception e) {
       print("EXCEPTION during model/recognizer init: " + e.toString());
@@ -169,15 +162,14 @@ public class MainActivity extends Activity {
   }
 
   public void print(String msg) {
-    runOnUiThread(() -> { statusText.append(msg + "\n"); statusText.invalidate(); });
+    synchronized (lock) {
+      runOnUiThread(() -> { statusText.append(msg + "\n"); statusText.invalidate(); });
+    }
   }
 
   private void startRecording() {
     try {
-      recorder = new AudioRecord(MediaRecorder.AudioSource.MIC, sampleRate,
-          AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT,
-          AudioRecord.getMinBufferSize(sampleRate, AudioFormat.CHANNEL_IN_MONO,
-              AudioFormat.ENCODING_PCM_16BIT));
+      recorder = new AudioRecord(MediaRecorder.AudioSource.MIC, sampleRate, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT, AudioRecord.getMinBufferSize(sampleRate, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT));
       recorder.startRecording();
       isRecording = true;
       recordButton.setText("Stop Recording");
@@ -187,20 +179,20 @@ public class MainActivity extends Activity {
         synchronized (lock) {
           offset = recordedBytes;
         }
-        int chunkSize = 8192;
-        long lastPrintTime = System.currentTimeMillis();
-        while (isRecording && offset < recordedData.length) {
-          int read = recorder.read(recordedData, offset, Math.min(chunkSize, recordedData.length - offset));
-          if (read > 0) {
+        int   chunkSize     = 8192;
+        float lastPrintTime = (System.nanoTime() / 1_000_000_000f);
+        while(isRecording && (offset < recordedData.length)) {
+          int read = recorder.read(recordedData, offset, Math.min(chunkSize, (recordedData.length - offset)));
+          if(read > 0) {
             offset += read;
             synchronized (lock) {
               recordedBytes = offset;
             }
-            float seconds = (float) offset / (sampleRate * 2);
-            if (System.currentTimeMillis() - lastPrintTime >= 2000) {
+            float seconds = ((float) offset / (sampleRate * 2));
+            if(((System.nanoTime() / 1_000_000_000f) - lastPrintTime) >= 2.0) {
               String status = String.format("RECORD: Bytes: %d | Duration: %.2f sec", offset, seconds);
               print(status);
-              lastPrintTime = System.currentTimeMillis();
+              lastPrintTime = (System.nanoTime() / 1_000_000_000f);
             }
           }
         }
@@ -218,6 +210,8 @@ public class MainActivity extends Activity {
         recorder.stop   ();
         recorder.release();
         recorder = null;
+        float duration_sec = ((float) recordedBytes / (sampleRate * 2));
+        print("(stopRecording) duration_sec = " + duration_sec);
       }
     } catch (Exception e) {
       print("EXCEPTION: " + e.toString());
@@ -230,7 +224,7 @@ public class MainActivity extends Activity {
         if (playbackPosition >= recordedBytes) playbackPosition = 0;
       }
       int bufferSize = AudioTrack.getMinBufferSize(sampleRate, AudioFormat.CHANNEL_OUT_MONO, AudioFormat.ENCODING_PCM_16BIT);
-      player = new AudioTrack(AudioManager.STREAM_MUSIC, sampleRate, AudioFormat.CHANNEL_OUT_MONO, AudioFormat.ENCODING_PCM_16BIT, bufferSize, AudioTrack.MODE_STREAM);
+      player         = new AudioTrack(AudioManager.STREAM_MUSIC, sampleRate, AudioFormat.CHANNEL_OUT_MONO, AudioFormat.ENCODING_PCM_16BIT, bufferSize, AudioTrack.MODE_STREAM);
       player.play();
       isPlaying = true;
       playButton.setText("Stop Playback");
@@ -241,25 +235,25 @@ public class MainActivity extends Activity {
         synchronized (lock) {
           localPosition = playbackPosition;
         }
-        long lastPrintTime = System.currentTimeMillis();
-        while (isPlaying) {
-          int toWrite;
+        float lastPrintTime = (System.nanoTime() / 1_000_000_000f);
+        while(isPlaying) {
+          int toWrite ;
           int recorded;
           synchronized (lock) {
-            toWrite = Math.min(chunkSize, recordedBytes - localPosition);
+            toWrite  = Math.min(chunkSize, (recordedBytes - localPosition));
             recorded = recordedBytes;
           }
-          if (toWrite <= 0) break;
+          if(toWrite <= 0) break;
           player.write(recordedData, localPosition, toWrite);
           localPosition += toWrite;
           synchronized (lock) {
             playbackPosition = localPosition;
           }
-          if (System.currentTimeMillis() - lastPrintTime >= 2000) {
-            float seconds = (float) recorded / (sampleRate * 2);
-            String status = String.format("PLAY: Bytes: %d | Duration: %.2f sec | Pos: %d", recorded, seconds, localPosition);
+          if(((System.nanoTime() / 1_000_000_000f) - lastPrintTime) >= 2.0) {
+            float  seconds = (float) recorded / (sampleRate * 2);
+            String status  = String.format("PLAY: Bytes: %d | Duration: %.2f sec | Pos: %d", recorded, seconds, localPosition);
             print(status);
-            lastPrintTime = System.currentTimeMillis();
+            lastPrintTime  = (System.nanoTime() / 1_000_000_000f);
           }
         }
         runOnUiThread(this::stopPlayback);
@@ -273,7 +267,7 @@ public class MainActivity extends Activity {
     try {
       isPlaying = false;
       if (player != null) {
-        player.stop();
+        player.stop   ();
         player.release();
         player = null;
       }
@@ -285,7 +279,7 @@ public class MainActivity extends Activity {
 
   private void resetBuffer() {
     synchronized (lock) {
-      recordedBytes = 0;
+      recordedBytes    = 0;
       playbackPosition = 0;
     }
     print("BUFFER: Reset complete");

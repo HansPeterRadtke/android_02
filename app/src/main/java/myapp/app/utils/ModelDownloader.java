@@ -9,10 +9,9 @@ import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 
 public class ModelDownloader extends Thread {
-  private final MainActivity main;
-  public volatile boolean done = false;
-
-  private static final String VOSK_MODEL_URL = "https://alphacephei.com/vosk/models/vosk-model-en-us-0.22-lgraph.zip";
+  private final          MainActivity main;
+  public  volatile       boolean      done = false;
+  private static   final String       VOSK_MODEL_URL = "https://alphacephei.com/vosk/models/vosk-model-en-us-0.22-lgraph.zip";
 
   public ModelDownloader(MainActivity main) {
     this.main = main;
@@ -42,7 +41,7 @@ public class ModelDownloader extends Thread {
   }
 
   private void downloadFile(String urlString, File outFile) throws IOException {
-    URL url = new URL(urlString);
+    URL               url  = new URL(urlString);
     HttpURLConnection conn = (HttpURLConnection) url.openConnection();
     conn.connect();
 
@@ -53,8 +52,8 @@ public class ModelDownloader extends Thread {
       return;
     }
 
-    InputStream input = new BufferedInputStream(conn.getInputStream());
-    FileOutputStream output = new FileOutputStream(outFile);
+    InputStream      input  = new BufferedInputStream(conn.getInputStream());
+    FileOutputStream output = new FileOutputStream   (outFile);
 
     byte[] data = new byte[16384];
     int count;
@@ -67,10 +66,10 @@ public class ModelDownloader extends Thread {
       i++;
     }
 
-    output.flush();
-    output.close();
-    input.close();
-    conn.disconnect();
+    output.flush     ();
+    output.close     ();
+    input .close     ();
+    conn  .disconnect();
 
     main.print("DOWNLOADER: Finished downloading " + outFile.getName());
   }
