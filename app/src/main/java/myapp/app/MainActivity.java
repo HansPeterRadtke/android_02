@@ -18,14 +18,15 @@ import myapp.app.utils.ModelDownloader;
 
 public class MainActivity extends Activity {
 
-  private TextView statusText;
-  private TextView liveText;
-  private ScrollView liveScroll;
-  private Button recordButton;
-  private Button playButton;
-  private Button readTextButton;
-  private Button toTextButton;
-  private Button liveButton;
+  private Button     recordButton  ;
+  private Button     playButton    ;
+  private Button     readTextButton;
+  private Button     toTextButton  ;
+  private Button     liveButton    ;
+  private TextView   liveText      ;
+  private ScrollView liveScroll    ;
+  private TextView   statusText    ;
+  private ScrollView statusScroll  ;
 
   private STT stt;
 
@@ -40,51 +41,51 @@ public class MainActivity extends Activity {
 
     recordButton = new Button(this);
     recordButton.setText("Start Recording");
-    layout.addView(recordButton);
+    layout      .addView(recordButton);
 
     playButton = new Button(this);
     playButton.setText("Play Recorded Audio");
-    layout.addView(playButton);
+    layout    .addView(playButton);
 
     readTextButton = new Button(this);
     readTextButton.setText("Read Text");
-    layout.addView(readTextButton);
+    layout        .addView(readTextButton);
 
     toTextButton = new Button(this);
     toTextButton.setText("To Text");
-    layout.addView(toTextButton);
+    layout      .addView(toTextButton);
 
     liveButton = new Button(this);
     liveButton.setText("Start Live Transcription");
-    layout.addView(liveButton);
+    layout    .addView(liveButton);
 
-    liveText = new TextView(this);
-    liveText.setLayoutParams(new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
-    liveText.setTextIsSelectable(true);
-    liveText.setSingleLine(false);
-    liveText.setMinLines(1);
-    liveText.setMaxLines(10);
-    liveText.setText("");
-    liveScroll = new ScrollView(this);
-    liveScroll.setFillViewport(true);
-    liveScroll.setLayoutParams(new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
-    liveScroll.addView(liveText);
+    liveText = new TextView       (this);
+    liveText  .setLayoutParams    (new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+    liveText  .setTextIsSelectable(true);
+    liveText  .setSingleLine      (false);
+    liveText  .setMinLines        (1);
+    liveText  .setMaxLines        (10);
+    liveText  .setText            ("");
+    liveScroll = new ScrollView   (this);
+    liveScroll.setFillViewport    (true);
+    liveScroll.setLayoutParams    (new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+    liveScroll.addView            (liveText);
     layout.addView(liveScroll);
 
-    statusText = new TextView(this);
-    statusText.setLayoutParams(new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
-    statusText.setTextIsSelectable(true);
-    statusText.setSingleLine(false);
-    statusText.setMaxLines(Integer.MAX_VALUE);
-    ScrollView statusScroll = new ScrollView(this);
-    statusScroll.setFillViewport(true);
-    statusScroll.setLayoutParams(new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f));
-    statusScroll.addView(statusText);
+    statusText = new TextView       (this);
+    statusText  .setLayoutParams    (new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+    statusText  .setTextIsSelectable(true);
+    statusText  .setSingleLine      (false);
+    statusText  .setMaxLines        (Integer.MAX_VALUE);
+    statusText  .setText            ("");
+    statusScroll = new ScrollView   (this);
+    statusScroll.setFillViewport    (true);
+    statusScroll.setLayoutParams    (new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f));
+    statusScroll.addView            (statusText);
     layout.addView(statusScroll);
 
     setContentView(layout);
 
-    stt = new STT(this);
 
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
       if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
@@ -97,7 +98,7 @@ public class MainActivity extends Activity {
     });
 
     playButton.setOnClickListener(v -> {
-      if (!stt.isPlaying()) stt.startPlayback(); else stt.stopPlayback();
+      if (!stt.isPlaying  ()) stt.startPlayback (); else stt.stopPlayback ();
     });
 
     readTextButton.setOnClickListener(v -> {
@@ -112,15 +113,32 @@ public class MainActivity extends Activity {
       if (!stt.isLive()) stt.startLiveTranscription(); else stt.stopLiveTranscription();
     });
 
-    print("(onCreate) Creating ModelDownloader");
-    ModelDownloader md = new ModelDownloader(this, stt);
-    print("(onCreate) Starting ModelDownloader");
-    md.run();
+    new Thread(() -> {
+      print("(onCreateThread) Creating ModelDownloader");
+      ModelDownloader md = new ModelDownloader(this);
+      print("(onCreateThread) Starting ModelDownloader");
+      md.start();
+      while (!md.done) { try { Thread.sleep(200); } catch (InterruptedException ignore) {} }
+      print("(onCreateThread) Model download complete, creating Model and STT");
+      try {
+        java.io.File   modelDir = new java.io  .File (getFilesDir(), myapp.app.utils.ModelDownloader.VOSK_MODEL_NAME);
+        org.vosk.Model model    = new org .vosk.Model(modelDir.getAbsolutePath());
+        stt = new STT(this);
+        stt.setModel(model);
+      } catch (Exception e) {
+        print("EXCEPTION(onCreateThread) (Model load): " + e);
+      }
+    }).start();
+    print("(onCreate) Thread started and DONE");
   }
 
   public void print(String msg) {
-    runOnUiThread(() -> { statusText.append(msg + "\n"); statusText.invalidate(); });
+      runOnUiThread(() -> {
+          statusText.append(msg + "\n");
+          statusScroll.post(() -> statusScroll.fullScroll(ScrollView.FOCUS_DOWN));
+      });
   }
+
 
   public void setLiveText(String text) {
     runOnUiThread(() -> {

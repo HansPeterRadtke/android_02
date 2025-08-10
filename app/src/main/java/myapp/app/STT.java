@@ -15,25 +15,25 @@ import java.io.IOException;
 
 public class STT {
 
-  private final MainActivity main;
-  private Model model;
-  private Recognizer recognizer;
+  private final MainActivity main      ;
+  private       Model        model     ;
+  private       Recognizer   recognizer;
 
-  private final int sampleRate = 16000;
-  private final byte[] recordedData = new byte[sampleRate * 2 * 60 * 15];
-  private int recordedBytes = 0;
-  private int playbackPosition = 0;
+  private final int          sampleRate       = 16000;
+  private final byte[]       recordedData     = new byte[sampleRate * 2 * 60 * 15];
+  private       int          recordedBytes    = 0;
+  private       int          playbackPosition = 0;
 
   private boolean isRecording = false;
-  private boolean isPlaying = false;
-  private boolean isLive = false;
+  private boolean isPlaying   = false;
+  private boolean isLive      = false;
 
-  private AudioRecord recorder;
-  private AudioTrack player;
-  private AudioRecord liveRecorder;
-  private Thread liveThread;
-  private final Object lock = new Object();
-  private StringBuilder liveBuffer = new StringBuilder();
+  private       AudioRecord   recorder    ;
+  private       AudioTrack    player      ;
+  private       AudioRecord   liveRecorder;
+  private       Thread        liveThread  ;
+  private final Object        lock       = new Object       ();
+  private       StringBuilder liveBuffer = new StringBuilder();
 
   public STT(MainActivity main) {
     this.main = main;
@@ -50,28 +50,37 @@ public class STT {
   }
 
   public boolean isRecording() { return isRecording; }
-  public boolean isPlaying() { return isPlaying; }
-  public boolean isLive() { return isLive; }
+  public boolean isPlaying  () { return isPlaying  ; }
+  public boolean isLive     () { return isLive     ; }
 
   public void startRecording() {
     try {
-      int min = AudioRecord.getMinBufferSize(sampleRate, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT);
+      int min  = AudioRecord.getMinBufferSize(sampleRate, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT);
       recorder = new AudioRecord(MediaRecorder.AudioSource.MIC, sampleRate, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT, Math.max(min, 8192));
       recorder.startRecording();
       isRecording = true;
       new Thread(() -> {
-        int offset;
+        int   offset;
         synchronized (lock) { offset = recordedBytes; }
-        int chunkSize = 8192;
+        int   chunkSize   = 8192;
+        float seconds     =   -1;
+        float lastSeconds =    0;
+        int   read        =   -1;
         while (isRecording && (offset < recordedData.length)) {
-          int read = recorder.read(recordedData, offset, Math.min(chunkSize, recordedData.length - offset));
+          read = recorder.read(recordedData, offset, Math.min(chunkSize, recordedData.length - offset));
           if (read > 0) {
             offset += read;
             synchronized (lock) { recordedBytes = offset; }
-            float seconds = ((float) offset / (sampleRate * 2));
-            main.print(String.format("RECORD: read=%d offset=%d dur=%.2fs rms=%.1f dBFS", read, offset, seconds, rmsDb(recordedData, offset - read, read)));
+            seconds = ((float) offset / (sampleRate * 2));
+            if((seconds - lastSeconds) >= 2.0) {
+//              main.print(String.format("RECORD: read=%d offset=%d dur=%.2fs rms=%.1f dBFS", read, offset, seconds, rmsDb(recordedData, offset - read, read)));
+              main.print(String.format("RECORDED %.2f sec; ", seconds));
+              lastSeconds = seconds;
+            }
           }
         }
+        main.print(String.format("RECORDED %.2f sec; DONE; ", seconds));
+//        main.print(String.format("RECORD: read=%d offset=%d dur=%.2fs rms=%.1f dBFS", read, offset, seconds, rmsDb(recordedData, offset - read, read)));
       }).start();
     } catch (Exception e) {
       main.print("EXCEPTION(RECORD): " + e);
@@ -82,7 +91,7 @@ public class STT {
     try {
       isRecording = false;
       if (recorder != null) {
-        recorder.stop();
+        recorder.stop   ();
         recorder.release();
         recorder = null;
       }
@@ -95,12 +104,12 @@ public class STT {
     try {
       synchronized (lock) { if (playbackPosition >= recordedBytes) playbackPosition = 0; }
       int bufferSize = AudioTrack.getMinBufferSize(sampleRate, AudioFormat.CHANNEL_OUT_MONO, AudioFormat.ENCODING_PCM_16BIT);
-      player = new AudioTrack(AudioManager.STREAM_MUSIC, sampleRate, AudioFormat.CHANNEL_OUT_MONO, AudioFormat.ENCODING_PCM_16BIT, bufferSize, AudioTrack.MODE_STREAM);
+      player         = new AudioTrack(AudioManager.STREAM_MUSIC, sampleRate, AudioFormat.CHANNEL_OUT_MONO, AudioFormat.ENCODING_PCM_16BIT, bufferSize, AudioTrack.MODE_STREAM);
       player.play();
       isPlaying = true;
       new Thread(() -> {
-        int chunkSize = 1024;
-        int localPosition;
+        int   chunkSize     =  1024;
+        int   localPosition = -   1;
         synchronized (lock) { localPosition = playbackPosition; }
         while (isPlaying) {
           int toWrite;
@@ -121,7 +130,7 @@ public class STT {
     try {
       isPlaying = false;
       if (player != null) {
-        player.stop();
+        player.stop   ();
         player.release();
         player = null;
       }
@@ -137,16 +146,16 @@ public class STT {
         return;
       }
       int bufferSize = AudioRecord.getMinBufferSize(sampleRate, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT);
-      liveRecorder = new AudioRecord(MediaRecorder.AudioSource.MIC, sampleRate, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT, bufferSize);
+      liveRecorder   = new AudioRecord(MediaRecorder.AudioSource.MIC, sampleRate, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT, bufferSize);
       main.print("LIVE: recorder state=" + liveRecorder.getState());
       liveRecorder.startRecording();
       isLive = true;
       main.print("LIVE: started");
       liveBuffer.setLength(0);
       liveThread = new Thread(() -> {
-        byte[] buf = new byte[bufferSize];
-        float lastPartialLog = nowSec();
-        long totalRead = 0;
+        byte[] buf            = new byte[bufferSize];
+        float  lastPartialLog = nowSec();
+        long   totalRead      = 0;
         try {
           main.print("LIVE: started loop");
           while (isLive) {
@@ -158,7 +167,7 @@ public class STT {
             totalRead += read;
             boolean hasFinal = recognizer.acceptWaveForm(buf, read);
             if (hasFinal) {
-              String j = recognizer.getResult();
+              String j   = recognizer.getResult();
               String fin = extractTextJson(j, false);
               main.print("LIVE: acceptWaveForm=true bytes=" + read + " rms=" + String.format("%.1f", rmsDb(buf, 0, read)) + " finalJson=" + trimForLog(j));
               if (!fin.isEmpty()) {
@@ -172,7 +181,7 @@ public class STT {
               float now = nowSec();
               if ((now - lastPartialLog) >= 0.25f) {
                 String pjson = recognizer.getPartialResult();
-                String part = extractTextJson(pjson, true);
+                String part  = extractTextJson(pjson, true);
                 main.print("LIVE: acceptWaveForm=false bytes=" + read + " rms=" + String.format("%.1f", rmsDb(buf, 0, read)) + " partialJson=" + trimForLog(pjson) + " part='" + part + "'");
                 String shown = part.isEmpty() ? liveBuffer.toString() : (liveBuffer.length() > 0 ? (liveBuffer.toString() + " " + part) : part);
                 if (!shown.isEmpty()) main.setLiveText(shown);
@@ -181,7 +190,7 @@ public class STT {
             }
           }
           String finJson = recognizer.getFinalResult();
-          String fin = extractTextJson(finJson, false);
+          String fin     = extractTextJson(finJson, false);
           main.print("LIVE: finalFlush json=" + trimForLog(finJson) + " text='" + fin + "'");
           if (!fin.isEmpty()) {
             if (liveBuffer.length() > 0) liveBuffer.append(' ');
@@ -193,7 +202,7 @@ public class STT {
         } finally {
           try {
             if (liveRecorder != null) {
-              liveRecorder.stop();
+              liveRecorder.stop   ();
               liveRecorder.release();
             }
           } catch (Exception ignore) {}
@@ -224,6 +233,7 @@ public class STT {
         main.print("Cannot convert to text: model not loaded");
         return;
       }
+      long startTime = System.nanoTime();
       ByteArrayInputStream bais;
       synchronized (lock) {
         bais = new ByteArrayInputStream(recordedData, 0, recordedBytes);
@@ -236,10 +246,13 @@ public class STT {
         if (recognizer.acceptWaveForm(buffer, read)) {
           main.print(extractTextJson(recognizer.getResult(), false));
         } else {
-          main.print(extractTextJson(recognizer.getPartialResult(), true));
+//          main.print(extractTextJson(recognizer.getPartialResult(), true));
         }
       }
       main.print(extractTextJson(recognizer.getFinalResult(), false));
+      long endTime = System.nanoTime();
+      double elapsedSec = (endTime - startTime) / 1_000_000_000.0;
+      main.print(String.format("TO_TEXT: processing took %.3f seconds", elapsedSec));
     } catch (IOException e) {
       main.print("EXCEPTION(toText): " + e);
     }

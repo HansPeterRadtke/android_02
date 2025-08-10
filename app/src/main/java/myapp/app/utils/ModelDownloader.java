@@ -45,14 +45,14 @@ public class ModelDownloader extends Thread {
       if (zipFile.exists()) zipFile.delete();
 
       // Basic space check (model + unzip)
-      long needBytes = 3L * 1024L * 1024L * 1024L; // ~3 GB headroom for large models
+      long needBytes = (3L * 1024L * 1024L * 1024L); // ~3 GB headroom for large models
       long freeBytes = filesRoot.getUsableSpace();
       if (freeBytes < needBytes) {
         main.print("DOWNLOADER: Low space. Free=" + freeBytes + " need>=" + needBytes);
       }
 
       // Download
-      main.print("DOWNLOADER: Vosk model missing. Downloading...");
+      main   .print("DOWNLOADER: Vosk model missing. Downloading...");
       tempDir.mkdirs();
       downloadFile(VOSK_MODEL_URL, zipFile);
       if (!zipFile.isFile() || zipFile.length() < MIN_ZIP_BYTES) {
@@ -65,7 +65,7 @@ public class ModelDownloader extends Thread {
       zipFile.delete();
 
       // Determine actual extracted root
-      File extracted = new File(tempDir, VOSK_MODEL_NAME);
+      File extracted    = new File(tempDir, VOSK_MODEL_NAME);
       File sourceToMove = extracted.isDirectory() ? extracted : tempDir;
 
       // Move into final location atomically if possible
@@ -84,8 +84,8 @@ public class ModelDownloader extends Thread {
     } catch (Exception e) {
       main.print("EXCEPTION: " + e.toString());
       // cleanup on failure; do not leave empty final dir
-      if (tempDir.exists()) deleteRecursive(tempDir);
-      if (zipFile.exists()) zipFile.delete();
+      if (tempDir .exists()) deleteRecursive(tempDir);
+      if (zipFile .exists()) zipFile.delete();
       if (modelDir.exists() && modelDir.listFiles() != null && modelDir.listFiles().length == 0) {
         // remove empty final dir if accidentally created elsewhere
         // (we never create it here before success, but keep this for safety)
@@ -137,8 +137,8 @@ public class ModelDownloader extends Thread {
       }
 
       long contentLength = conn.getContentLengthLong();
-      long totalRead = 0;
-      long nextLog = 0;
+      long totalRead     = 0;
+      long nextLog       = 0;
 
       // Ensure parent dir exists
       File parent = outFile.getParentFile();
@@ -186,7 +186,7 @@ public class ModelDownloader extends Thread {
 
         // ZipSlip protection
         String targetPath = targetDir.getCanonicalPath();
-        String newPath    = newFile.getCanonicalPath();
+        String newPath    = newFile  .getCanonicalPath();
         if (!newPath.startsWith(targetPath + File.separator) && !newPath.equals(targetPath)) {
           zis.closeEntry();
           throw new IOException("Blocked Zip-Slip entry: " + ze.getName());
