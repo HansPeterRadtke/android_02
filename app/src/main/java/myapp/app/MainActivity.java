@@ -29,6 +29,7 @@ public class MainActivity extends Activity {
   private ScrollView statusScroll  ;
 
   private STT stt;
+  private TTS tts; // Added TTS object
 
   private static final int PERMISSION_REQUEST_CODE = 200;
 
@@ -102,7 +103,12 @@ public class MainActivity extends Activity {
     });
 
     readTextButton.setOnClickListener(v -> {
-      print("Read Text pressed");
+      print("Read Text button pressed — NEW VERSION");
+      if (tts != null) {
+        tts.speak("This is an example text being read out loud.");
+      } else {
+        print("TTS object is null — cannot speak");
+      }
     });
 
     toTextButton.setOnClickListener(v -> {
@@ -125,6 +131,7 @@ public class MainActivity extends Activity {
         org.vosk.Model model    = new org .vosk.Model(modelDir.getAbsolutePath());
         stt = new STT(this);
         stt.setModel(model);
+        tts = new TTS(this); // Initialize TTS after STT is ready
       } catch (Exception e) {
         print("EXCEPTION(onCreateThread) (Model load): " + e);
       }

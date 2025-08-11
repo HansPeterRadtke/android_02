@@ -7,7 +7,7 @@ android {
   compileSdk   34
 
   defaultConfig {
-        ndk { abiFilters "arm64-v8a" }
+    ndk { abiFilters "arm64-v8a" }
     applicationId "myapp.app"
     minSdk        21
     targetSdk     34
@@ -28,7 +28,25 @@ android {
   packagingOptions {
     resources {
       excludes    += ['META-INF/LGPL2.1']
-      pickFirsts  += ['**/libvosk.so']
+    }
+    jniLibs {
+      useLegacyPackaging = true
+    }
+  }
+}
+
+afterEvaluate {
+  tasks.matching { it.name == "mergeDebugNativeLibs" || it.name == "mergeReleaseNativeLibs" }.all { task ->
+    task.doFirst {
+      def archDir = new File(projectDir, "src/main/jniLibs/arm64-v8a")
+      if (archDir.exists()) {
+        def destDir = new File(project.buildDir, "intermediates/merged_jni_libs/${task.name.contains('Release') ? 'release' : 'debug'}/out/arm64-v8a")
+        destDir.mkdirs()
+        new File(destDir, "libpiper.so").bytes = new File(archDir, "libpiper.so").bytes
+        println "Copied libpiper.so into ${destDir} before packaging."
+      } else {
+        println "WARNING: src/main/jniLibs/arm64-v8a not found."
+      }
     }
   }
 }
@@ -37,4 +55,5 @@ dependencies {
   implementation("org.jetbrains.kotlin:kotlin-stdlib:1.8.10")
   implementation("androidx.core:core:1.12.0")
   implementation("com.alphacephei:vosk-android:0.3.47")
+  implementation("org.kamranzafar:jtar:2.3")
 }
