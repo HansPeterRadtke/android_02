@@ -10,15 +10,16 @@ import java.util.zip.ZipInputStream;
 
 public class ModelDownloader extends Thread {
   public  volatile       boolean      done = false;
-//  public  static   final String       VOSK_MODEL_NAME = "vosk-model-en-us-0.22-lgraph";
-//  public  static   final String       VOSK_MODEL_NAME = "vosk-model-small-en-us-0.15";
   public  static   final String       VOSK_MODEL_NAME = "vosk-model-en-us-0.22";
   private static   final String       VOSK_MODEL_URL  = "https://alphacephei.com/vosk/models/" + VOSK_MODEL_NAME + ".zip";
+
+  private static   final String       FLITE_MODEL_NAME = "cmu_us_slt.flitevox";
+  private static   final String       FLITE_MODEL_URL  = "http://mirrors.cn99.com/freeswitch/downloads/libs/voices/cmu_us_slt.flitevox";
 
   private static   final int          CONNECT_TIMEOUT_MS = 60_000;
   private static   final int          READ_TIMEOUT_MS    = 60_000;
   private static   final int          BUFFER_SIZE        = 64 * 1024;
-  private static   final long         MIN_ZIP_BYTES      = 10_000L; // sanity check
+  private static   final long         MIN_ZIP_BYTES      = 10_000L;
 
   private final          MainActivity main;
 
@@ -29,7 +30,7 @@ public class ModelDownloader extends Thread {
   @Override
   public void run() {
     main.print("DOWNLOADER: Checking model files...");
-    File filesRoot = main.getFilesDir(); // avoid cache eviction and size limits
+    File filesRoot = main.getFilesDir();
     File modelDir  = new File(filesRoot, VOSK_MODEL_NAME);
     File tempDir   = new File(filesRoot, VOSK_MODEL_NAME + ".tmp");
     File zipFile   = new File(filesRoot, VOSK_MODEL_NAME + ".zip");
@@ -37,58 +38,59 @@ public class ModelDownloader extends Thread {
     try {
       if (modelDir.isDirectory()) {
         main.print("DOWNLOADER: Vosk model found.");
-        return;
+      } else {
+        if (tempDir.exists()) deleteRecursive(tempDir);
+        if (zipFile.exists()) zipFile.delete();
+
+        long needBytes = (3L * 1024L * 1024L * 1024L);
+        long freeBytes = filesRoot.getUsableSpace();
+        if (freeBytes < needBytes) {
+          main.print("DOWNLOADER: Low space. Free=" + freeBytes + " need>=" + needBytes);
+        }
+
+        main   .print("DOWNLOADER: Vosk model missing. Downloading...");
+        tempDir.mkdirs();
+        downloadFile(VOSK_MODEL_URL, zipFile);
+        if (!zipFile.isFile() || zipFile.length() < MIN_ZIP_BYTES) {
+          throw new IOException("Zip missing or too small: " + zipFile.getAbsolutePath());
+        }
+
+        main.print("DOWNLOADER: Unzipping " + zipFile.getName());
+        unzip(zipFile, tempDir);
+        zipFile.delete();
+
+        File extracted    = new File(tempDir, VOSK_MODEL_NAME);
+        File sourceToMove = extracted.isDirectory() ? extracted : tempDir;
+
+        if (sourceToMove.equals(modelDir)) {
+        } else if (!sourceToMove.renameTo(modelDir)) {
+          copyDirectory(sourceToMove, modelDir);
+          deleteRecursive(sourceToMove);
+        }
+
+        if (tempDir.exists() && !tempDir.equals(modelDir)) deleteRecursive(tempDir);
+
+        main.print("DOWNLOADER: Model ready at " + modelDir.getAbsolutePath());
       }
 
-      // Clean any previous temp leftovers
-      if (tempDir.exists()) deleteRecursive(tempDir);
-      if (zipFile.exists()) zipFile.delete();
-
-      // Basic space check (model + unzip)
-      long needBytes = (3L * 1024L * 1024L * 1024L); // ~3 GB headroom for large models
-      long freeBytes = filesRoot.getUsableSpace();
-      if (freeBytes < needBytes) {
-        main.print("DOWNLOADER: Low space. Free=" + freeBytes + " need>=" + needBytes);
+      // === Download Flite model if missing ===
+      File fliteFile = new File(filesRoot, FLITE_MODEL_NAME);
+      if (!fliteFile.isFile()) {
+        main.print("DOWNLOADER: Flite model missing. Downloading...");
+        downloadFile(FLITE_MODEL_URL, fliteFile);
+        if (!fliteFile.isFile() || fliteFile.length() < 1024) {
+          throw new IOException("Flite model missing or too small: " + fliteFile.getAbsolutePath());
+        }
+        main.print("DOWNLOADER: Flite model ready at " + fliteFile.getAbsolutePath());
+      } else {
+        main.print("DOWNLOADER: Flite model found.");
       }
 
-      // Download
-      main   .print("DOWNLOADER: Vosk model missing. Downloading...");
-      tempDir.mkdirs();
-      downloadFile(VOSK_MODEL_URL, zipFile);
-      if (!zipFile.isFile() || zipFile.length() < MIN_ZIP_BYTES) {
-        throw new IOException("Zip missing or too small: " + zipFile.getAbsolutePath());
-      }
-
-      // Unzip to temp
-      main.print("DOWNLOADER: Unzipping " + zipFile.getName());
-      unzip(zipFile, tempDir);
-      zipFile.delete();
-
-      // Determine actual extracted root
-      File extracted    = new File(tempDir, VOSK_MODEL_NAME);
-      File sourceToMove = extracted.isDirectory() ? extracted : tempDir;
-
-      // Move into final location atomically if possible
-      if (sourceToMove.equals(modelDir)) {
-        // already correct
-      } else if (!sourceToMove.renameTo(modelDir)) {
-        // Fallback to copy if rename fails (e.g., cross-volume edge cases)
-        copyDirectory(sourceToMove, modelDir);
-        deleteRecursive(sourceToMove);
-      }
-
-      // Cleanup any temp leftovers
-      if (tempDir.exists() && !tempDir.equals(modelDir)) deleteRecursive(tempDir);
-
-      main.print("DOWNLOADER: Model ready at " + modelDir.getAbsolutePath());
     } catch (Exception e) {
       main.print("EXCEPTION: " + e.toString());
-      // cleanup on failure; do not leave empty final dir
       if (tempDir .exists()) deleteRecursive(tempDir);
       if (zipFile .exists()) zipFile.delete();
       if (modelDir.exists() && modelDir.listFiles() != null && modelDir.listFiles().length == 0) {
-        // remove empty final dir if accidentally created elsewhere
-        // (we never create it here before success, but keep this for safety)
         modelDir.delete();
       }
       pause(1.0f);
@@ -121,7 +123,6 @@ public class ModelDownloader extends Thread {
           conn.disconnect();
           throw new IOException("Redirect without Location for " + urlString);
         }
-        // Resolve relative redirects
         URL newUrl = new URL(url, loc);
         currentUrl = newUrl.toString();
         conn.disconnect();
@@ -140,7 +141,6 @@ public class ModelDownloader extends Thread {
       long totalRead     = 0;
       long nextLog       = 0;
 
-      // Ensure parent dir exists
       File parent = outFile.getParentFile();
       if (parent != null && !parent.exists()) parent.mkdirs();
 
@@ -153,12 +153,11 @@ public class ModelDownloader extends Thread {
           out.write(buf, 0, r);
           totalRead += r;
 
-          // Progress logging: every +1% or every +8 MB when length unknown
           if (contentLength > 0) {
             long percent = (totalRead * 100) / contentLength;
             if (percent >= nextLog) {
               main.print("DOWNLOADER: " + percent + "% (" + (totalRead / (1024 * 1024)) + " MiB)");
-              nextLog = percent + 5; // log every ~5%
+              nextLog = percent + 5;
             }
           } else if (totalRead - nextLog >= (8L << 20)) {
             main.print("DOWNLOADER: " + (totalRead / (1024 * 1024)) + " MiB");
@@ -184,7 +183,6 @@ public class ModelDownloader extends Thread {
       while ((ze = zis.getNextEntry()) != null) {
         File newFile = new File(targetDir, ze.getName());
 
-        // ZipSlip protection
         String targetPath = targetDir.getCanonicalPath();
         String newPath    = newFile  .getCanonicalPath();
         if (!newPath.startsWith(targetPath + File.separator) && !newPath.equals(targetPath)) {
@@ -226,8 +224,6 @@ public class ModelDownloader extends Thread {
     }
   }
 
-  // Helpers
-
   private void deleteRecursive(File f) {
     if (f == null || !f.exists()) return;
     if (f.isDirectory()) {
@@ -236,7 +232,6 @@ public class ModelDownloader extends Thread {
         for (File c : files) deleteRecursive(c);
       }
     }
-    //noinspection ResultOfMethodCallIgnored
     f.delete();
   }
 

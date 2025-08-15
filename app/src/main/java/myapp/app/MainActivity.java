@@ -131,7 +131,7 @@ public class MainActivity extends Activity {
         org.vosk.Model model    = new org .vosk.Model(modelDir.getAbsolutePath());
         stt = new STT(this);
         stt.setModel(model);
-        tts = new TTS(this); // Initialize TTS after STT is ready
+        tts = new TTS(new java.io.File(getFilesDir(), "cmu_us_slt.flitevox").getAbsolutePath()); // Initialize TTS with correct path
       } catch (Exception e) {
         print("EXCEPTION(onCreateThread) (Model load): " + e);
       }
