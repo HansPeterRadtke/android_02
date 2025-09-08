@@ -14,7 +14,6 @@ import java.io.ByteArrayInputStream;
 import java.io.IOException;
 
 public class STT {
-    static { System.loadLibrary("ttsflite"); }
 
   private final MainActivity main      ;
   private       Model        model     ;

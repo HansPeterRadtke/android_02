@@ -128,10 +128,10 @@ public class MainActivity extends Activity {
       print("(onCreateThread) Model download complete, creating Model and STT");
       try {
         java.io.File   modelDir = new java.io  .File (getFilesDir(), myapp.app.utils.ModelDownloader.VOSK_MODEL_NAME);
-        org.vosk.Model model    = new org .vosk.Model(modelDir.getAbsolutePath());
-        stt = new STT(this);
-        stt.setModel(model);
-        tts = new TTS(new java.io.File(getFilesDir(), "cmu_us_slt.flitevox").getAbsolutePath()); // Initialize TTS with correct path
+//        org.vosk.Model model    = new org .vosk.Model(modelDir.getAbsolutePath());
+//        stt = new STT(this);
+//        stt.setModel(model);
+        tts = new TTS(this, new java.io.File(getFilesDir(), "cmu_us_slt.flitevox").getAbsolutePath()); // Initialize TTS with correct path
       } catch (Exception e) {
         print("EXCEPTION(onCreateThread) (Model load): " + e);
       }
