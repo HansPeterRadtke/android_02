@@ -131,7 +131,15 @@ public class MainActivity extends Activity {
 //        org.vosk.Model model    = new org .vosk.Model(modelDir.getAbsolutePath());
 //        stt = new STT(this);
 //        stt.setModel(model);
-        tts = new TTS(this, new java.io.File(getFilesDir(), "cmu_us_slt.flitevox").getAbsolutePath()); // Initialize TTS with correct path
+        java.io.File voiceFile = new java.io.File(getFilesDir(), "cmu_us_slt.flitevox");
+        if (voiceFile.exists()) {
+          print("Voice file found at: " + voiceFile.getAbsolutePath() + " (size: " + voiceFile.length() + ")");
+          try { Thread.sleep(1000); } catch (InterruptedException e) { e.printStackTrace(); }
+          tts = new TTS(this, voiceFile.getAbsolutePath());
+        } else {
+          print("Voice file missing at: " + voiceFile.getAbsolutePath());
+          try { Thread.sleep(1000); } catch (InterruptedException e) { e.printStackTrace(); }
+        }
       } catch (Exception e) {
         print("EXCEPTION(onCreateThread) (Model load): " + e);
       }
