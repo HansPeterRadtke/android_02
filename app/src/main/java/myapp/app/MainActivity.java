@@ -29,7 +29,7 @@ public class MainActivity extends Activity {
   private ScrollView statusScroll  ;
 
   private STT stt;
-  private TTS tts; // Added TTS object
+  private TTS tts;
 
   private static final int PERMISSION_REQUEST_CODE = 200;
 
@@ -128,10 +128,15 @@ public class MainActivity extends Activity {
       print("(onCreateThread) Model download complete, creating Model and STT");
       try {
         java.io.File   modelDir = new java.io  .File (getFilesDir(), myapp.app.utils.ModelDownloader.VOSK_MODEL_NAME);
-//        org.vosk.Model model    = new org .vosk.Model(modelDir.getAbsolutePath());
-//        stt = new STT(this);
-//        stt.setModel(model);
+        print("(onCreateThread) modelDir created");
+        org.vosk.Model model    = new org .vosk.Model(modelDir.getAbsolutePath());
+        print("(onCreateThread) model created");
+        stt = new STT(this);
+        print("(onCreateThread) STT created");
+        stt.setModel(model);
+        print("(onCreateThread) STT.Model set");
         java.io.File voiceFile = new java.io.File(getFilesDir(), "cmu_us_slt.flitevox");
+        print("(onCreateThread) voiceFile created");
         if (voiceFile.exists()) {
           print("Voice file found at: " + voiceFile.getAbsolutePath() + " (size: " + voiceFile.length() + ")");
           try { Thread.sleep(1000); } catch (InterruptedException e) { e.printStackTrace(); }

@@ -37,6 +37,7 @@ public class STT {
 
   public STT(MainActivity main) {
     this.main = main;
+    main.print("(STT) created");
   }
 
   public void setModel(Model model) {
@@ -54,6 +55,7 @@ public class STT {
   public boolean isLive     () { return isLive     ; }
 
   public void startRecording() {
+    main.print("(STT:startRecording) called");
     try {
       int min  = AudioRecord.getMinBufferSize(sampleRate, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT);
       recorder = new AudioRecord(MediaRecorder.AudioSource.MIC, sampleRate, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT, Math.max(min, 8192));
@@ -88,6 +90,7 @@ public class STT {
   }
 
   public void stopRecording() {
+    main.print("(STT:stopRecording) called");
     try {
       isRecording = false;
       if (recorder != null) {
@@ -101,6 +104,7 @@ public class STT {
   }
 
   public void startPlayback() {
+    main.print("(STT:startPlayback) called");
     try {
       synchronized (lock) { if (playbackPosition >= recordedBytes) playbackPosition = 0; }
       int bufferSize = AudioTrack.getMinBufferSize(sampleRate, AudioFormat.CHANNEL_OUT_MONO, AudioFormat.ENCODING_PCM_16BIT);
@@ -127,6 +131,7 @@ public class STT {
   }
 
   public void stopPlayback() {
+    main.print("(STT:stopPlayback) called");
     try {
       isPlaying = false;
       if (player != null) {
@@ -140,6 +145,7 @@ public class STT {
   }
 
   public void startLiveTranscription() {
+    main.print("(STT:startLiveTranscription) called");
     try {
       if (model == null || recognizer == null) {
         main.print("Cannot start live transcription: model not loaded");
@@ -220,6 +226,7 @@ public class STT {
   }
 
   public void stopLiveTranscription() {
+    main.print("(STT:stopLiveTranscription) called");
     isLive = false;
     if (liveThread != null) {
       try { liveThread.join(1000); } catch (InterruptedException ignored) {}
@@ -228,6 +235,7 @@ public class STT {
   }
 
   public void toText() {
+    main.print("(STT:toText) called");
     try {
       if (model == null || recognizer == null) {
         main.print("Cannot convert to text: model not loaded");
