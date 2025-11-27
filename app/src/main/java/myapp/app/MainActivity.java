@@ -103,11 +103,11 @@ public class MainActivity extends Activity {
     });
 
     readTextButton.setOnClickListener(v -> {
-      print("Read Text button pressed — NEW VERSION");
+      print("Read Text button pressed â€” NEW VERSION");
       if (tts != null) {
         tts.speak("This is an example text being read out loud.");
       } else {
-        print("TTS object is null — cannot speak");
+        print("TTS object is null â€” cannot speak");
       }
     });
 
@@ -127,6 +127,7 @@ public class MainActivity extends Activity {
       while (!md.done) { try { Thread.sleep(200); } catch (InterruptedException ignore) {} }
       print("(onCreateThread) Model download complete, creating Model and STT");
       try {
+        /*
         java.io.File   modelDir = new java.io  .File (getFilesDir(), myapp.app.utils.ModelDownloader.VOSK_MODEL_NAME);
         print("(onCreateThread) modelDir created");
         org.vosk.Model model    = new org .vosk.Model(modelDir.getAbsolutePath());
@@ -145,6 +146,8 @@ public class MainActivity extends Activity {
           print("Voice file missing at: " + voiceFile.getAbsolutePath());
           try { Thread.sleep(1000); } catch (InterruptedException e) { e.printStackTrace(); }
         }
+        */
+        tts = new TTS(this, "/sdcard/Android/data/myapp.app/files/models/kokoro.onnx");
       } catch (Exception e) {
         print("EXCEPTION(onCreateThread) (Model load): " + e);
       }
