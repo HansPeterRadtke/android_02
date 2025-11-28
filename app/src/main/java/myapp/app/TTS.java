@@ -13,11 +13,14 @@ import java.net.URL;
 import ai.onnxruntime.OrtEnvironment;
 import ai.onnxruntime.OrtException;
 import ai.onnxruntime.OrtSession;
+import myapp.app.tts.ExternalOrtTts;
+
 
 public final class TTS {
 
     private static final Object LOCK = new Object();
 
+    // We keep these fields for compatibility, but Kokoro is managed by ExternalOrtTts.
     private static OrtEnvironment env = null;
     private static OrtSession session = null;
     private static boolean initialized = false;
@@ -149,12 +152,22 @@ public final class TTS {
         }
     }
 
+    /**
+     * Ensure that:
+     *  - the ONNX model file exists in externalFilesDir("models")/kokoro.onnx (download if needed)
+     *  - ExternalOrtTts has been initialized once with this appContext
+     *
+     * We DO NOT create or close OrtEnvironment/OrtSession here directly.
+     * All ORT lifetime is delegated to ExternalOrtTts.
+     */
     private void ensureInitialized() {
         synchronized (LOCK) {
-            if (initialized && env != null && session != null) {
+            // If we already successfully initialized and ExternalOrtTts is still initialized, nothing to do.
+            if (initialized && ExternalOrtTts.isInitialized()) {
                 return;
             }
 
+            // Make sure the model file is there (download once if needed)
             if (!ensureModelPresent()) {
                 initialized = false;
                 env = null;
@@ -162,32 +175,17 @@ public final class TTS {
                 return;
             }
 
-            File finalModel = getFinalModelFile();
-            if (finalModel == null || !finalModel.exists()) {
-                lastError = "TTS.ensureInitialized: final model not available";
-                log(lastError);
-                initialized = false;
+            try {
+                log("TTS.ensureInitialized: calling ExternalOrtTts.initialize(...)");
+                ExternalOrtTts.initialize(appContext);
+
+                // We don't store environment/session here; ExternalOrtTts owns them.
                 env = null;
                 session = null;
-                return;
-            }
-
-            try {
-                log("TTS.ensureInitialized: using model file: " + finalModel.getAbsolutePath());
-
-                env = OrtEnvironment.getEnvironment("android02-tts-env");
-                OrtSession.SessionOptions opts = new OrtSession.SessionOptions();
-                session = env.createSession(finalModel.getAbsolutePath(), opts);
 
                 initialized = true;
                 lastError = null;
-                log("TTS.ensureInitialized: ORT environment and session initialized");
-            } catch (OrtException e) {
-                lastError = "TTS.ensureInitialized OrtException: " + e.getMessage();
-                log(lastError);
-                initialized = false;
-                env = null;
-                session = null;
+                log("TTS.ensureInitialized: ExternalOrtTts initialized successfully");
             } catch (Throwable t) {
                 lastError = "TTS.ensureInitialized Throwable: " + t.getMessage();
                 log(lastError);
@@ -200,7 +198,8 @@ public final class TTS {
 
     public boolean isInitialized() {
         synchronized (LOCK) {
-            return initialized && env != null && session != null;
+            // Treat initialized == true AND ExternalOrtTts.isInitialized() == true as "OK".
+            return initialized && ExternalOrtTts.isInitialized();
         }
     }
 
@@ -210,24 +209,18 @@ public final class TTS {
         }
     }
 
-    // ONLY place where ORT objects are closed
+    // ONLY place where ORT objects are closed (delegated to ExternalOrtTts)
     public void shutdown() {
         synchronized (LOCK) {
-            log("TTS.shutdown: releasing ORT session and environment");
-            if (session != null) {
-                try {
-                    session.close();
-                } catch (Throwable ignored) {
-                }
-                session = null;
+            log("TTS.shutdown: calling ExternalOrtTts.shutdown()");
+            try {
+                ExternalOrtTts.shutdown();
+            } catch (Throwable ignored) {
             }
-            if (env != null) {
-                try {
-                    env.close();
-                } catch (Throwable ignored) {
-                }
-                env = null;
-            }
+
+            // Keep these null for compatibility; they are not used for Kokoro anymore.
+            session = null;
+            env = null;
             initialized = false;
             lastError = null;
         }
@@ -242,21 +235,37 @@ public final class TTS {
         new Thread(new Runnable() {
             @Override
             public void run() {
+                // Make sure the model exists and ExternalOrtTts is initialized exactly once.
                 ensureInitialized();
 
-                synchronized (LOCK) {
-                    if (!initialized || env == null || session == null) {
-                        log("TTS.speak: initialization failed, aborting. lastError=" + lastError);
-                        return;
+                if (!isInitialized()) {
+                    log("TTS.speak: initialization failed, aborting. lastError=" + getLastError());
+                    return;
+                }
+
+                final OrtSession kokoroSession;
+                try {
+                    kokoroSession = ExternalOrtTts.getSession();
+                } catch (Throwable t) {
+                    synchronized (LOCK) {
+                        lastError = "TTS.speak: failed to obtain Kokoro OrtSession: " + t.getMessage();
                     }
+                    log(lastError);
+                    return;
                 }
 
                 // At this point:
-                // - env and session are live singletons
-                // - model has been downloaded once into:
-                //   <externalFilesDir("models")>/kokoro.onnx
-                // Add actual Kokoro inference + audio playback here.
-                log("TTS.speak: session ready, text length=" + text.length());
+                //  - ExternalOrtTts has a live OrtEnvironment and OrtSession
+                //  - The ONNX model file is located at:
+                //        <externalFilesDir(\"models\")>/kokoro.onnx
+                //
+                // The actual Kokoro inference and audio playback code should use kokoroSession.
+                // This class does not close kokoroSession; it is managed by ExternalOrtTts.
+                log("TTS.speak: Kokoro session ready, text length=" + text.length());
+
+                // TODO: hook your existing Kokoro inference + audio playback pipeline here,
+                // using 'kokoroSession' as the OrtSession for scoring.
+                // Do not close kokoroSession here.
             }
         }, "TTS-SPEAK").start();
     }

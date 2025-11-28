@@ -9,7 +9,8 @@ del "app\build\outputs\apk\debug\app-debug.apk" 2>nul
 
 REM === Build APK ===
 echo Running Gradle assembleDebug...
-call gradle assembleDebug --console=plain > gradle.log 2>&1
+REM call gradle assembleDebug --console=plain > gradle.log 2>&1
+call gradle assembleDebug --console=plain
 IF ERRORLEVEL 1 (
     echo Build failed! See gradle_log.txt for details.
     exit /b 1
