@@ -1,48 +1,61 @@
+import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
+
 plugins {
-  id 'com.android.application'
+    id 'com.android.application'
 }
+apply plugin: 'kotlin-android'
 
 android {
-  namespace    'myapp.app'
-  compileSdk   34
+    namespace  'myapp.app'
+    compileSdk 34
 
-  defaultConfig {
-    ndk { abiFilters "arm64-v8a" }
-    applicationId "myapp.app"
-    minSdk 24
-    targetSdk     34
-  }
+    defaultConfig {
+        ndk { abiFilters "arm64-v8a" }
+        applicationId "myapp.app"
+        minSdk       24
+        targetSdk    34
+    }
 
-  buildTypes {
-    release {
-      minifyEnabled false
+    buildTypes {
+        release {
+            minifyEnabled false
+        }
     }
-  }
 
-  sourceSets {
-    main {
-      jniLibs.srcDirs = ['src/main/jniLibs']
+    sourceSets {
+        main {
+            jniLibs.srcDirs = ['src/main/jniLibs']
+        }
     }
-  }
 
-  packagingOptions {
-    resources {
-      excludes    += ['META-INF/LGPL2.1']
+    packagingOptions {
+        resources {
+            excludes += ['META-INF/LGPL2.1']
+        }
+        jniLibs {
+            useLegacyPackaging = true
+        }
     }
-    jniLibs {
-      useLegacyPackaging = true
-    }
-  }
 }
 
 dependencies {
-  implementation("org.jetbrains.kotlin:kotlin-stdlib:1.8.10")
-  implementation("androidx.core:core:1.12.0")
-  implementation("com.alphacephei:vosk-android:0.3.47")
-  implementation("org.kamranzafar:jtar:2.3")
-  implementation("com.microsoft.onnxruntime:onnxruntime-android:1.23.2")
+    implementation('org.jetbrains.bio:npy:0.3.5') {
+        exclude group: 'org.jetbrains.kotlin', module: 'kotlin-stdlib'
+        exclude group: 'org.jetbrains.kotlin', module: 'kotlin-stdlib-jdk7'
+        exclude group: 'org.jetbrains.kotlin', module: 'kotlin-stdlib-jdk8'
+    }
+
+    implementation "androidx.core:core:1.12.0"
+    implementation "androidx.appcompat:appcompat:1.6.1"
+    implementation "com.google.android.material:material:1.11.0"
+
+    implementation "com.alphacephei:vosk-android:0.3.47"
+    implementation "org.kamranzafar:jtar:2.3"
+    implementation "com.microsoft.onnxruntime:onnxruntime-android:1.23.2"
 }
 
-
-
-
+tasks.withType(KotlinCompile).configureEach {
+    kotlinOptions {
+        jvmTarget = "1.8"
+    }
+}

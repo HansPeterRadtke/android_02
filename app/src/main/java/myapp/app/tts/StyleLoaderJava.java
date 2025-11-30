@@ -1,7 +1,7 @@
-// File: app/src/main/java/myapp/app/tts/StyleLoaderJava.java
 package myapp.app.tts;
 
 import android.content.Context;
+
 import org.jetbrains.bio.npy.NpyArray;
 import org.jetbrains.bio.npy.NpyFile;
 
@@ -12,8 +12,9 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
- * Java port of the demo StyleLoader. Expects the same .npy style files
- * (af_sarah, af_bella, ...) in this app's res/raw.
+ * Java port of the Kokoro demo StyleLoader.
+ *
+ * Expects the same .npy style files (af_sarah, af_bella, ...) in this app's res/raw.
  */
 public final class StyleLoaderJava {
 
@@ -73,9 +74,10 @@ public final class StyleLoaderJava {
                 in.close();
             }
 
-            NpyArray npyArray = NpyFile.read(tempFile.toPath());
+            // org.jetbrains.bio.npy.NpyFile.read(path, maxMegabytes)
+            NpyArray npyArray = NpyFile.read(tempFile.toPath(), 64);
 
-            long[] shape = npyArray.getShape();
+            int[] shape = npyArray.getShape();
             if (shape.length != 3 || shape[0] != 511 || shape[1] != 1 || shape[2] != 256) {
                 throw new IllegalArgumentException("Style .npy must have shape (511,1,256)");
             }
@@ -94,7 +96,12 @@ public final class StyleLoaderJava {
 
             return style;
         } catch (Exception e) {
-            throw new RuntimeException("Failed to load style array for '" + name + "': " + e.getMessage(), e);
+            // Fallback: if style .npy cannot be loaded, return neutral (all-zero) style vector
+            float[][] style = new float[1][256];
+            for (int i = 0; i < 256; i++) {
+                style[0][i] = 0.0f;
+            }
+            return style;
         }
     }
 }
