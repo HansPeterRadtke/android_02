@@ -1,5 +1,12 @@
 package myapp.app;
 
+import myapp.app.tts.PhonemeConverter;
+import myapp.app.tts.CreateAudioKt;
+import myapp.app.tts.ExternalOrtTts;
+import myapp.app.tts.KokoroWaveDebug;
+import myapp.app.tts.StyleLoaderJava;
+import myapp.app.tts.Tokenizer;
+
 import android.content.Context;
 import android.media.AudioAttributes;
 import android.media.AudioFormat;
@@ -20,13 +27,7 @@ import java.util.Map;
 import ai.onnxruntime.OnnxTensor;
 import ai.onnxruntime.OrtEnvironment;
 import ai.onnxruntime.OrtSession;
-import myapp.app.tts.ExternalOrtTts;
-import myapp.app.tts.KokoroWaveDebug;
-import myapp.app.tts.StyleLoaderJava;
-import com.example.kokoro82m.utils.PhonemeConverter;
-import com.example.kokoro82m.utils.CreateAudioKt;
 import kotlin.Pair;
-import myapp.app.tts.TokenizerJava;
 /**
  * Kokoro TTS for myapp.app, wired like the demo:
  * - kokoro.onnx in externalFilesDir("models")/kokoro.onnx
@@ -55,7 +56,7 @@ public final class TTS {
     private static final String MODEL_URL = "https://g3wt.jonnyonthefly.org/explorer/kokoro.onnx";
 
     // ONNX interface
-    private static final int SAMPLE_RATE = 22050;
+    private static final int SAMPLE_RATE = 24000;
     private static final int MAX_PHONEME_LENGTH = 400;
     private static final float DEFAULT_SPEED = 1.0f;
 
@@ -351,7 +352,6 @@ public final class TTS {
                     }
 
                     playAudio(audio, SAMPLE_RATE);
-log("TTS.speak: playback done");
                 } catch (Throwable t) {
                     synchronized (LOCK) {
                         lastError = "TTS.speak: exception: " + t.getMessage();
@@ -373,9 +373,8 @@ log("TTS.speak: playback done");
 
     // ======== TOKENIZER / VOCAB ========
 
-    private static long[] tokenize(String phonemes) {
-        // Delegate to demo-style tokenizer
-        return TokenizerJava.tokenize(phonemes);
+    private static long[] tokenize(String text) {
+        return Tokenizer.tokenize(text);
     }
 
     // ======== AUDIO PLAYBACK ========
