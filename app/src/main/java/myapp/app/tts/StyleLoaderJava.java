@@ -10,54 +10,63 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
+import java.util.HashMap;
+import java.util.Map;
 
 /**
- * Style loader that reads Kokoro voice style vectors from a single .bin file
- * in the same "models" directory as kokoro.onnx.
+ * Flexible style loader:
  *
- * EXPECTED FILE LOCATION ON DEVICE:
- *   /storage/emulated/0/Android/data/myapp.app/files/models/voices_af.bin
+ * - Supports multiple voice files: af.bin, au.bin, bf.bin, etc.
+ * - Each file is float32, shape [N, 256] (N styles, 256-dim vectors).
+ * - Files are stored in:
  *
- * EXPECTED FORMAT:
- *   - float32 (little-endian)
- *   - length = N * 256 floats (N style vectors, each of size 256)
+ *   /sdcard/Android/data/myapp.app/files/models/voices_XX.bin
  *
- * TTS STILL CALLS:
- *   StyleLoaderJava loader = new StyleLoaderJava(context);
- *   float[][] style = loader.getStyleArray("af_sarah", 0);
+ *   e.g. voices_af.bin, voices_au.bin, voices_bf.bin, ...
  *
- * We IGNORE name/index and always return voices[0] as a [1][256] style array.
+ * - Public API is still:
+ *
+ *   getStyleArray(String name, int index)
+ *
+ *   Where "name" can be "af", "au", "bf", etc.
+ *   And "index" is [0 .. N-1].
+ *
+ * - If requested voice/index missing, falls back to a neutral zero style.
  */
 public class StyleLoaderJava {
 
     private static final String TAG = "StyleLoaderJava";
-
-    // Name of the voices file next to kokoro.onnx in "models" dir
-    private static final String VOICES_FILE_NAME = "voices_af.bin";
     private static final int STYLE_DIM = 256;
 
     private final Context context;
-    private float[][] voices; // [numVoices][256]
+
+    // Cache: "af" -> float[numVoices][256]
+    private final Map<String, float[][]> cache = new HashMap<>();
 
     public StyleLoaderJava(Context context) {
         this.context = context.getApplicationContext();
-        try {
-            loadVoicesFromExternalModelsDir();
-        } catch (Exception e) {
-            Log.e(TAG, "Failed to load style vectors from " + VOICES_FILE_NAME + ": " + e.getMessage(), e);
-            // Fallback: keep voices == null so getStyleArray() can return neutral zeros
-            this.voices = null;
-        }
     }
 
-    private void loadVoicesFromExternalModelsDir() throws IOException {
+    private float[][] loadVoices(String voiceName) throws IOException {
+        if (voiceName == null || voiceName.isEmpty()) {
+            throw new IOException("voiceName is null/empty");
+        }
+
+        // If cached, return immediately
+        float[][] cached = cache.get(voiceName);
+        if (cached != null) {
+            return cached;
+        }
+
         File modelsDir = context.getExternalFilesDir("models");
         if (modelsDir == null) {
             throw new IOException("getExternalFilesDir(\"models\") returned null");
         }
 
-        File voicesFile = new File(modelsDir, VOICES_FILE_NAME);
-        Log.d(TAG, "Loading voices from: " + voicesFile.getAbsolutePath());
+        String fileName = "voices_" + voiceName + ".bin";
+        File voicesFile = new File(modelsDir, fileName);
+
+        Log.d(TAG, "Loading voice '" + voiceName + "' from: " + voicesFile.getAbsolutePath());
 
         if (!voicesFile.exists()) {
             throw new IOException("Voices file not found: " + voicesFile.getAbsolutePath());
@@ -72,14 +81,13 @@ public class StyleLoaderJava {
         }
 
         int totalFloats = (int) (length / 4L);
-
         if ((totalFloats % STYLE_DIM) != 0) {
             throw new IOException("Total floats " + totalFloats +
                     " is not a multiple of STYLE_DIM=" + STYLE_DIM);
         }
 
         int numVoices = totalFloats / STYLE_DIM;
-        Log.d(TAG, "Voices file OK: totalFloats=" + totalFloats +
+        Log.d(TAG, "Voices '" + voiceName + "': totalFloats=" + totalFloats +
                 ", numVoices=" + numVoices + ", styleDim=" + STYLE_DIM);
 
         byte[] data = new byte[(int) length];
@@ -96,45 +104,56 @@ public class StyleLoaderJava {
 
         ByteBuffer buf = ByteBuffer.wrap(data).order(ByteOrder.LITTLE_ENDIAN);
 
-        float[][] tmpVoices = new float[numVoices][STYLE_DIM];
+        float[][] voices = new float[numVoices][STYLE_DIM];
         for (int v = 0; v < numVoices; v++) {
-            float[] row = tmpVoices[v];
+            float[] row = voices[v];
             for (int i = 0; i < STYLE_DIM; i++) {
                 row[i] = buf.getFloat();
             }
         }
 
-        this.voices = tmpVoices;
-        Log.d(TAG, "Loaded " + numVoices + " style vectors from voices file.");
+        cache.put(voiceName, voices);
+        Log.d(TAG, "Loaded " + numVoices + " style vectors for voice '" + voiceName + "'.");
+        return voices;
     }
 
-    /**
-     * Public API kept compatible with earlier code:
-     *   getStyleArray(String name, int index)
-     *
-     * We ignore name/index and always:
-     *   - if voices available: return voices[0] as [1][256]
-     *   - else: return neutral zero style [1][256]
-     */
     public float[][] getStyleArray(String name, int index) {
-        if (voices == null || voices.length == 0) {
-            Log.w(TAG, "No style vectors loaded, returning neutral zero style.");
-            float[][] neutral = new float[1][STYLE_DIM];
-            for (int i = 0; i < STYLE_DIM; i++) {
-                neutral[0][i] = 0.0f;
+        // name like "af", "au", "bf" etc. as we choose in TTS.java
+        if (name == null || name.isEmpty()) {
+            Log.w(TAG, "getStyleArray called with empty name, returning neutral style.");
+            return neutralStyle();
+        }
+
+        try {
+            float[][] voices = loadVoices(name);
+
+            if (voices.length == 0) {
+                Log.w(TAG, "Voices array empty for '" + name + "', returning neutral.");
+                return neutralStyle();
             }
-            return neutral;
+
+            int chosen = index;
+            if (chosen < 0 || chosen >= voices.length) {
+                chosen = 0; // default to first style
+            }
+
+            float[][] out = new float[1][STYLE_DIM];
+            System.arraycopy(voices[chosen], 0, out[0], 0, STYLE_DIM);
+
+            Log.d(TAG, "Returning style voice='" + name + "', index=" + chosen);
+            return out;
+
+        } catch (Exception e) {
+            Log.e(TAG, "Error in getStyleArray('" + name + "', " + index + "): " + e.getMessage(), e);
+            return neutralStyle();
         }
+    }
 
-        int chosen = 0;
-        if (index >= 0 && index < voices.length) {
-            chosen = index;
+    private float[][] neutralStyle() {
+        float[][] neutral = new float[1][STYLE_DIM];
+        for (int i = 0; i < STYLE_DIM; i++) {
+            neutral[0][i] = 0.0f;
         }
-
-        float[][] out = new float[1][STYLE_DIM];
-        System.arraycopy(voices[chosen], 0, out[0], 0, STYLE_DIM);
-
-        Log.d(TAG, "Returning style vector index=" + chosen + ", name=" + name);
-        return out;
+        return neutral;
     }
 }
