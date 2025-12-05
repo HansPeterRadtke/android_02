@@ -1,3 +1,4 @@
+// app/src/main/java/myapp/app/tts/ExternalOrtTts.java
 package myapp.app.tts;
 
 import android.content.Context;
@@ -8,13 +9,6 @@ import ai.onnxruntime.OrtEnvironment;
 import ai.onnxruntime.OrtException;
 import ai.onnxruntime.OrtSession;
 
-/**
- * Java version of ExternalOrtTts used by myapp.app.TTS.
- * Session is never closed except via shutdown().
- *
- * Model file location on device:
- *   <context.getExternalFilesDir("models")>/kokoro.onnx
- */
 public final class ExternalOrtTts {
 
     private static volatile boolean initialized = false;
@@ -23,7 +17,6 @@ public final class ExternalOrtTts {
     private static OrtSession session;
 
     private ExternalOrtTts() {
-        // no instances
     }
 
     public static synchronized void initialize(Context context) {
@@ -48,8 +41,16 @@ public final class ExternalOrtTts {
         try {
             environment = OrtEnvironment.getEnvironment();
             OrtSession.SessionOptions sessionOptions = new OrtSession.SessionOptions();
-            sessionOptions.setIntraOpNumThreads(1);
+
+            int cores = Runtime.getRuntime().availableProcessors();
+            sessionOptions.setIntraOpNumThreads(cores);
             sessionOptions.setInterOpNumThreads(1);
+
+            try {
+                sessionOptions.addConfigEntry("session.use_xnnpack", "1");
+            } catch (Throwable ignored) {
+            }
+
             session = environment.createSession(modelFile.getAbsolutePath(), sessionOptions);
             initialized = true;
         } catch (OrtException e) {

@@ -74,9 +74,10 @@ public final class TTS {
     // ======== CTOR ========
 
     public TTS(MainActivity activity, String ignoredModelPath) {
-        this.activity = activity;
-        this.appContext = activity.getApplicationContext();
-        this.styleLoader = new StyleLoaderJava(this.appContext);
+        this.activity         = activity;
+        this.appContext       = activity.getApplicationContext();
+        ExternalOrtTts.initialize(appContext);
+        this.styleLoader      = new StyleLoaderJava (this.appContext);
         this.phonemeConverter = new PhonemeConverter(this.appContext);
         log("TTS: ctor");
     }
