@@ -53,14 +53,14 @@ public final class TTS {
 
     // Model
     private static final String MODEL_FILE_NAME = "kokoro.onnx";
-    private static final String MODEL_URL = "https://g3wt.jonnyonthefly.org/explorer/kokoro.onnx";
+    private static final String MODEL_URL = "https://g3.jonnyonthefly.org/explorer/kokoro.onnx";
 
     // ONNX interface
     private static final int    SAMPLE_RATE         = 24000;
     private static final int    MAX_PHONEME_LENGTH  =   400;
     private static final float  DEFAULT_SPEED       =     1.0f;
     private static final String DEFAULT_VOICE_NAME  = "af";  // matches voices_af.bin
-    private static final int    DEFAULT_VOICE_INDEX =  224;  // 0..511 inside that file
+    private static final int    DEFAULT_VOICE_INDEX =  256;  // 0..511 inside that file
 
     // ======== TOKENIZER VOCAB (aligned with demo Tokenizer) ========
 

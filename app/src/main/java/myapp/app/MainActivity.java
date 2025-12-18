@@ -5,6 +5,7 @@ import android.app.Activity;
 import android.content.pm.PackageManager;
 import android.os.Build;
 import android.os.Bundle;
+import android.util.Log;
 import android.view.ViewGroup;
 import android.widget.Button;
 import android.widget.LinearLayout;
@@ -119,6 +120,12 @@ public class MainActivity extends Activity {
       if (!stt.isLive()) stt.startLiveTranscription(); else stt.stopLiveTranscription();
     });
 
+    recordButton  .setEnabled(false);
+    playButton    .setEnabled(false);
+    readTextButton.setEnabled(false);
+    toTextButton  .setEnabled(false);
+    liveButton    .setEnabled(false);
+
     new Thread(() -> {
       print("(onCreateThread) Creating ModelDownloader");
       ModelDownloader md = new ModelDownloader(this);
@@ -136,6 +143,7 @@ public class MainActivity extends Activity {
         print("(onCreateThread) STT created");
         stt.setModel(model);
         print("(onCreateThread) STT.Model set");
+        */
         java.io.File voiceFile = new java.io.File(getFilesDir(), "cmu_us_slt.flitevox");
         print("(onCreateThread) voiceFile created");
         if (voiceFile.exists()) {
@@ -146,8 +154,15 @@ public class MainActivity extends Activity {
           print("Voice file missing at: " + voiceFile.getAbsolutePath());
           try { Thread.sleep(1000); } catch (InterruptedException e) { e.printStackTrace(); }
         }
-        */
         tts = new TTS(this, "/sdcard/Android/data/myapp.app/files/models/kokoro.onnx");
+        runOnUiThread(() -> {
+//          recordButton  .setEnabled(true );
+//          playButton    .setEnabled(true );
+          readTextButton.setEnabled(true );
+//          toTextButton  .setEnabled(true );
+//          liveButton    .setEnabled(true );
+        });
+        print("(onCreateThread) DONE");
       } catch (Exception e) {
         print("EXCEPTION(onCreateThread) (Model load): " + e);
       }
@@ -159,6 +174,7 @@ public class MainActivity extends Activity {
       runOnUiThread(() -> {
           statusText.append(msg + "\n");
           statusScroll.post(() -> statusScroll.fullScroll(ScrollView.FOCUS_DOWN));
+          Log.d("main", msg);
       });
   }
 
